@@ -42,6 +42,7 @@ function init() {
 
         // Buttons
         newGameBtn: document.getElementById('new-game-btn'),
+        startGameDirektBtn: document.getElementById('start-game-direkt-btn'),
         optionsBtn: document.getElementById('options-btn'),
         creationBackBtn: document.getElementById('creation-back-btn'),
         confirmCreationBtn: document.getElementById('confirm-creation-btn'),
@@ -59,6 +60,9 @@ function init() {
         classSelect: document.getElementById('creation-class-select'),
         genderSelector: document.getElementById('creation-gender-selector'),
         charNameInput: document.getElementById('creation-char-name'),
+
+        // Game Screen Elements
+        gameCharacterCardContainer: document.getElementById('game-character-card-container'),
     };
     
     setupEventListeners();
@@ -66,7 +70,12 @@ function init() {
     
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('action') === 'continue') {
-        showScreen('game');
+        const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
+        if (characterData) {
+            startGame(characterData);
+        } else {
+            showScreen('title');
+        }
     } else {
         showScreen('title');
     }
@@ -88,6 +97,15 @@ function setupEventListeners() {
     ui.optionsBtn.addEventListener('click', () => showScreen('options'));
     document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
     ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
+
+    ui.startGameDirektBtn.addEventListener('click', () => {
+        const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
+        if (characterData) {
+            startGame(characterData);
+        } else {
+            alert('Bitte erstelle zuerst einen Charakter im Menü "Charakter erstellen".');
+        }
+    });
 
     // New Creation Screen Listeners
     if (ui.creationScreen) {
@@ -129,7 +147,7 @@ function showScreen(screenId) {
             }
             break;
         case 'game':
-            // Logic for showing game screen
+            if (ui.gameScreen) ui.gameScreen.style.display = 'block';
             break;
     }
 }
@@ -216,10 +234,27 @@ function confirmCharacter() {
     // For now, log to console and save to localStorage
     console.log("Character Confirmed:", finalCharData);
     localStorage.setItem('selectedCharacter', JSON.stringify(finalCharData));
-    alert(`Charakter ${name} wurde erstellt!`);
 
-    // Potentially switch to game screen
-    // showScreen('game');
+    startGame(finalCharData);
+}
+
+function startGame(characterData) {
+    showScreen('game');
+
+    // Populate character card in the game screen
+    const card = `
+        <div class="character-card-game">
+            <img src="${characterData.image}" alt="${characterData.name}">
+            <h3>${characterData.name}</h3>
+            <p>${characterData.class}</p>
+            <div class="card-stats">
+                <span>STÄ: ${characterData.stats.strength}</span>
+                <span>GES: ${characterData.stats.dexterity}</span>
+                <span>INT: ${characterData.stats.intelligence}</span>
+            </div>
+        </div>
+    `;
+    ui.gameCharacterCardContainer.innerHTML = card;
 }
 
 window.onload = init;
