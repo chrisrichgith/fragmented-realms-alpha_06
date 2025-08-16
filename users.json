@@ -4,13 +4,13 @@
     "email": "christiandittrich74@googlemail.com",
     "password": "$2b$10$iNPU5YqkJeIy5nh3wnTrK.ayhgQ0/MJkWX2EJBOF0BjcGX9RMD/vG",
     "resources": {
-      "gold": 225,
-      "holz": 202,
-      "erz": 204,
-      "kristall": 204
+      "gold": 208,
+      "holz": 187,
+      "erz": 187,
+      "kristall": 187
     },
     "unlockedGames": [],
-    "lastLogin": "2025-08-16T18:31:36.443Z",
+    "lastLogin": "2025-08-16T22:47:20.265Z",
     "createdAt": "2025-08-08T09:17:23.842Z",
     "isOnline": false,
     "isAdmin": true,
@@ -21,16 +21,6 @@
       "strength": 5,
       "dexterity": 5,
       "intelligence": 5
-    },
-    "selectedCharacter": {
-      "name": "Hannes",
-      "image": "/images/RPG/Charakter/Krieger_m_p.png",
-      "stats": {
-        "strength": 8,
-        "dexterity": 4,
-        "intelligence": 3
-      },
-      "gender": "male"
     }
   },
   "Christian": {
@@ -38,15 +28,15 @@
     "email": "c_dittrich@gmx.de",
     "password": "$2b$10$jv1/4CW4Rqn3WOBKUfCss.P0qSPEVk5CMo3q805wYqHgQ1Hl827/O",
     "resources": {
-      "gold": 529,
-      "holz": 640,
-      "erz": 640,
-      "kristall": 590
+      "gold": 456,
+      "holz": 568,
+      "erz": 566,
+      "kristall": 518
     },
     "unlockedGames": [
       "space-shooter"
     ],
-    "lastLogin": "2025-08-16T13:48:52.573Z",
+    "lastLogin": "2025-08-15T21:24:17.952Z",
     "createdAt": "2025-08-08T09:47:25.858Z",
     "isOnline": false,
     "isAdmin": false,

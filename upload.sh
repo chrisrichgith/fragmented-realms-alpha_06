@@ -4,7 +4,7 @@
 # Führe dieses Skript in dem Ordner aus, der die Dateien enthält, die du hochladen möchtest.
 
 # URL des Repositories
-REPO_URL="https://github.com/ChrisRichGith/Fragmented-Realms-Alpha_05.git"
+REPO_URL="https://github.com/ChrisRichGith/Fragmented-Realms-Alpha_06.git"
 
 # --- Skript beginnt hier ---
 

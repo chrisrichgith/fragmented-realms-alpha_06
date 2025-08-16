@@ -2,7 +2,7 @@ const RPG_CLASSES = {
     "Krieger": {
         description: "Stark und widerstandsfähig, ein Meister des Nahkampfes.",
         stats: { strength: 8, dexterity: 4, intelligence: 3 },
-        img: { male: '/images/RPG/Charakter/Krieger_m_p.png', female: '/images/RPG/Charakter/Krieger_w_p.png' },
+        imgName: "Krieger",
         abilities: {
             "Schwerthieb": { name: "Schwerthieb", type: "Angriff", target: "Einzel", cost: 0, cooldown: 0, value: "100% Waffenschaden", effect: "+10% Trefferchance" },
             "Schildstoß": { name: "Schildstoß", type: "Angriff", target: "Einzel", cost: 15, cooldown: 2, value: "50% Waffenschaden", effect: "Stößt zurück (50% Chance)" },
@@ -18,7 +18,7 @@ const RPG_CLASSES = {
     "Heiler": {
         description: "Ein heiliger Kleriker, der Verbündete heilt und schützt.",
         stats: { strength: 3, dexterity: 4, intelligence: 8 },
-        img: { male: '/images/RPG/Charakter/Heiler_m_p.png', female: '/images/RPG/Charakter/Heiler_w_p.png' },
+        imgName: "Heiler",
         abilities: {
             "Lichtberührung": { name: "Lichtberührung", type: "Heilung", target: "Einzel", cost: 15, cooldown: 0, value: "50 + 120% INT" },
             "Lebensstrom": { name: "Lebensstrom", type: "Heilung", target: "Gruppe", cost: 35, cooldown: 3, duration: 3, value: "20 + 50% INT pro Runde" },
@@ -33,7 +33,7 @@ const RPG_CLASSES = {
     "Magier": {
         description: "Beherrscht die arkanen Künste, um Feinde aus der Ferne zu vernichten.",
         stats: { strength: 2, dexterity: 5, intelligence: 8 },
-        img: { male: '/images/RPG/Charakter/Magier_m_p.png', female: '/images/RPG/Charakter/Magier_w_p.png' },
+        imgName: "Magier",
         abilities: {
             "Feuerball": { name: "Feuerball", type: "Zauber (Angriff)", target: "AoE", cost: 30, cooldown: 2, value: "80 + 150% INT", duration: 2, effect: "Verbrennung (10 Schaden/Runde)" },
             "Frostlanze": { name: "Frostlanze", type: "Zauber (Angriff)", target: "Einzel", cost: 20, cooldown: 1, value: "60 + 100% INT", effect: "Verlangsamt Gegner (30%)" },
@@ -48,7 +48,7 @@ const RPG_CLASSES = {
     "Schurke": {
         description: "Ein listiger Kämpfer, der aus den Schatten zuschlägt.",
         stats: { strength: 4, dexterity: 8, intelligence: 3 },
-        img: { male: '/images/RPG/Charakter/Schurke_m_p.png', female: '/images/RPG/Charakter/Schurke_w_p.png' },
+        imgName: "Schurke",
         abilities: {
             "Meucheln": { name: "Meucheln", type: "Angriff", target: "Einzel", cost: 20, cooldown: 2, value: "150% Waffenschaden", effect: "+100% Schaden bei Unsichtbarkeit" },
             "Giftklinge": { name: "Giftklinge", type: "Angriff", target: "Einzel", cost: 15, cooldown: 1, duration: 3, value: "20% Waffenschaden/Runde" },
@@ -63,7 +63,7 @@ const RPG_CLASSES = {
     "Bogenschütze": {
         description: "Ein Meisterschütze mit Pfeil und Bogen.",
         stats: { strength: 4, dexterity: 8, intelligence: 3 },
-        img: { male: '/images/RPG/Charakter/Archer_m_p.png', female: '/images/RPG/Charakter/Archer_w_p.png' },
+        imgName: "Archer",
         abilities: {
             "Durchdringender Pfeil": { name: "Durchdringender Pfeil", type: "Angriff", target: "Linie", cost: 25, cooldown: 2, value: "120% Waffenschaden" },
             "Schnellschuss": { name: "Schnellschuss", type: "Angriff", target: "Einzel", cost: 30, cooldown: 3, effect: "Schießt 3 Pfeile mit je 60% Waffenschaden" },
@@ -78,7 +78,7 @@ const RPG_CLASSES = {
     "Arkaner Komponist": {
         description: "Magischer Taktgeber mit Klangzaubern.",
         stats: { strength: 1, dexterity: 7, intelligence: 7 },
-        img: { male: '/images/RPG/Charakter/arkaner_m_p.png', female: '/images/RPG/Charakter/arkaner_w_p.png' },
+        imgName: "arkaner",
         abilities: {
             "Synergie": { name: "Synergie", type: "Angriff", target: "Passiv", effect: "Chance auf zusätzlichen Schaden nach Aktionen von Verbündeten" },
             "Harmonie": { name: "Harmonie", type: "Unterstützung", target: "Gruppe", cost: 30, cooldown: 3, duration: 3, effect: "+10% auf alle Basisattribute" },

@@ -46,12 +46,38 @@
 
         <!-- Character Creation Screen (initially hidden) -->
         <div id="character-creation-screen" style="display: none;">
-            <h2>Wähle deine Klasse</h2>
-            <div id="character-cards-container">
-                <!-- Character cards will be inserted here by JavaScript -->
+            <h2>Charaktererstellung</h2>
+            <div id="creation-main-container">
+                <div id="creation-character-display">
+                    <img id="creation-portrait-display" src="/images/RPG/Charakter/male_silhouette.svg" alt="Selected Portrait">
+                    <div id="creation-class-display" class="creation-text-display">Klasse</div>
+                    <p id="creation-class-description" class="creation-text-display">Wähle eine Klasse, um eine Beschreibung und die Basiswerte zu sehen.</p>
+                    <div id="creation-stats-display" class="creation-text-display"></div>
+                    <div id="creation-char-name-wrapper">
+                        <label for="creation-char-name">Charaktername:</label>
+                        <input type="text" id="creation-char-name" placeholder="Name eingeben...">
+                    </div>
+                    <div id="creation-class-wrapper">
+                        <label for="creation-class-select">Klasse:</label>
+                        <select id="creation-class-select"></select>
+                    </div>
+                    <div id="creation-gender-wrapper">
+                        <label>Geschlecht:</label>
+                        <div class="gender-selector" id="creation-gender-selector">
+                             <button class="gender-btn active" data-gender="male"><img src="/images/RPG/Charakter/male_silhouette.svg" alt="Männlich"></button>
+                             <button class="gender-btn" data-gender="female"><img src="/images/RPG/Charakter/female_silhouette.svg" alt="Weiblich"></button>
+                        </div>
+                    </div>
+                </div>
+                <div id="portrait-gallery">
+                    <h3>Porträt auswählen</h3>
+                    <div id="portrait-gallery-container">
+                        <!-- Portraits will be inserted here by JavaScript -->
+                    </div>
+                </div>
             </div>
             <div class="menu-buttons">
-                <button id="start-game-btn" disabled>Spiel starten</button>
+                <button id="confirm-creation-btn" disabled>Charakter bestätigen</button>
                 <button id="creation-back-btn">Zurück</button>
             </div>
         </div>
