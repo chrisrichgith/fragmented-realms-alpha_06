@@ -412,6 +412,7 @@ input[type=range]::-moz-range-thumb {
     height: 200px;
     border-radius: 10px;
     object-fit: cover;
+    object-position: center 70%;
     border: 2px solid #c9b037;
 }
 
@@ -473,6 +474,7 @@ input[type=range]::-moz-range-thumb {
     border: 3px solid transparent;
     transition: all 0.2s ease;
     object-fit: cover;
+    object-position: center 70%;
 }
 
 .portrait-item:hover {
