@@ -131,6 +131,7 @@
         <source src="/Sounds/RPG/Declined_choir.mp3" type="audio/mpeg">
     </audio>
 
+    <script src="class_data.js"></script>
     <script src="game.js"></script>
 
     <!-- Custom Character Creation Modal -->
@@ -186,6 +187,12 @@
             <div class="modal-section">
                 <label for="save-name-input">Name des Spielstands:</label>
                 <input type="text" id="save-name-input" maxlength="30" placeholder="Mein Abenteuer">
+            </div>
+            <div class="modal-section">
+                <h3>Vorhandene Spielstände:</h3>
+                <div id="existing-saves-container">
+                    <!-- Existing saves will be listed here -->
+                </div>
             </div>
             <div class="modal-buttons">
                 <button id="confirm-save-btn">Speichern</button>

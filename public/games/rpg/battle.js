@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     let currentMap = '';
     let MAP_CONFIG_EDITABLE = {};
+    let battleCharacters = []; // Holds the state of all characters in the battle
 
     // --- DOM Elements ---
     const playerCardContainer = document.getElementById('player-character-card');
@@ -108,57 +109,149 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- CHARACTER CARD FUNCTIONS ---
 
-    function createCharacterCard(characterData) {
-        if (!characterData) return null;
+    function createCharacterCard(characterId) {
+        const character = battleCharacters.find(c => c.id === characterId);
+        if (!character) return null;
+
+        const { data, isPlayer } = character;
+        const hp = data.hp ?? Math.floor(Math.random() * 80) + 20;
+        const maxHp = data.maxHp ?? 100;
+        const mana = data.mana ?? Math.floor(Math.random() * 60) + 40;
+        const maxMana = data.maxMana ?? 100;
+
         const card = document.createElement('div');
-        card.className = 'char-card';
-        const name = characterData.name || 'Unknown';
-        const imageSrc = characterData.image || '/images/RPG/Charakter/male_silhouette.svg';
-        const img = document.createElement('img');
-        img.src = imageSrc;
-        img.alt = name;
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'char-card-info';
-        const nameHeader = document.createElement('h3');
-        nameHeader.textContent = name;
-        infoDiv.appendChild(nameHeader);
-        const dropZone = document.createElement('div');
-        dropZone.className = 'char-drop-zone';
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-over');
-        });
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('drag-over');
-        });
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-over');
-            const itemId = e.dataTransfer.getData('text/plain');
-            const itemElement = document.getElementById(itemId);
-            if (itemElement && dropZone.childElementCount === 0) {
-                playSound('/Sounds/RPG/Drag_rev.mp3'); // Play sound on drop
-                dropZone.appendChild(itemElement);
+        const name = data.name || 'Unknown';
+
+        const createStatBar = (current, max, type) => {
+            const container = document.createElement('div');
+            container.className = 'stat-bar-container';
+            const bar = document.createElement('div');
+            bar.className = 'stat-bar';
+            const fill = document.createElement('div');
+            fill.className = `${type}-bar`;
+            fill.style.width = `${(current / max) * 100}%`;
+            const value = document.createElement('span');
+            value.className = 'stat-value';
+            value.textContent = `${current} / ${max}`;
+            bar.appendChild(fill);
+            container.appendChild(bar);
+            container.appendChild(value);
+            return container;
+        };
+
+        const createDropZone = (charId) => {
+            const dropZone = document.createElement('div');
+            dropZone.className = 'char-drop-zone';
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const droppedItemId = e.dataTransfer.getData('text/plain');
+                const itemElement = document.getElementById(droppedItemId);
+                if (itemElement && dropZone.childElementCount === 0) {
+                    playSound('/Sounds/RPG/Drag_rev.mp3');
+                    dropZone.appendChild(itemElement);
+                    applyItemBuff(charId, itemElement.querySelector('img').alt);
+                }
+            });
+            return dropZone;
+        };
+
+        if (isPlayer) {
+            card.className = 'char-card';
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'char-card-info';
+            const nameHeader = document.createElement('h3');
+            nameHeader.textContent = name;
+            infoDiv.appendChild(nameHeader);
+
+            const topSection = document.createElement('div');
+            topSection.className = 'char-top-section';
+            const imageSrc = data.image || '/images/RPG/Charakter/male_silhouette.svg';
+            const img = document.createElement('img');
+            img.src = imageSrc;
+            img.alt = name;
+            topSection.appendChild(img);
+            topSection.appendChild(createDropZone(characterId));
+
+            const statsContainer = document.createElement('div');
+            statsContainer.className = 'char-stats-container';
+            statsContainer.appendChild(createStatBar(hp, maxHp, 'health'));
+            statsContainer.appendChild(createStatBar(mana, maxMana, 'mana'));
+
+            card.appendChild(infoDiv);
+            card.appendChild(topSection);
+            card.appendChild(statsContainer);
+        } else {
+            card.className = 'npc-card';
+            const infoSection = document.createElement('div');
+            infoSection.className = 'npc-info-section';
+            const classHeader = document.createElement('h4');
+            classHeader.className = 'npc-class';
+            classHeader.textContent = data.class || name;
+            const statsContainer = document.createElement('div');
+            statsContainer.className = 'npc-stats-container';
+            statsContainer.appendChild(createStatBar(hp, maxHp, 'health'));
+            statsContainer.appendChild(createStatBar(mana, maxMana, 'mana'));
+            infoSection.appendChild(classHeader);
+            infoSection.appendChild(statsContainer);
+            card.appendChild(infoSection);
+            card.appendChild(createDropZone(characterId));
+        }
+        return card;
+    }
+
+    function applyItemBuff(characterId, itemName) {
+        const character = battleCharacters.find(c => c.id === characterId);
+        const item = TACTIC_ITEMS[itemName];
+
+        if (!character || !item) {
+            console.error("Character or item not found for buff application.");
+            return;
+        }
+
+        console.log(`Applying buff from item "${itemName}" to character "${character.data.name}".`);
+
+        // This is a placeholder for the actual buff logic.
+        // For now, we will just log the intended effects.
+        item.effects.forEach(effect => {
+            if (effect.class === 'All' || effect.class === character.data.class) {
+                console.log(`  - Effect applies to class: ${character.data.class}`);
+                if (effect.ability) {
+                    console.log(`    - Modifying ability: ${effect.ability}`);
+                    console.log(`    - Property: ${effect.property}, Modifier: ${effect.modifier.type} ${effect.modifier.value}`);
+                } else {
+                    console.log(`    - Modifying global stat: ${effect.property}`);
+                    console.log(`    - Modifier: ${effect.modifier.type} ${effect.modifier.value}`);
+                }
+                // Here you would apply the change to a temporary copy of the character data
             }
         });
-        card.appendChild(img);
-        card.appendChild(infoDiv);
-        card.appendChild(dropZone);
-        return card;
     }
 
     function displayCharacters() {
         playerCardContainer.innerHTML = '';
         npcCardsContainer.innerHTML = '';
+        battleCharacters = []; // Reset the battle characters array
+
         const playerCharData = JSON.parse(localStorage.getItem('selectedCharacter'));
         if (playerCharData) {
-            const playerCard = createCharacterCard(playerCharData);
+            const playerId = `player-${Date.now()}`;
+            battleCharacters.push({ id: playerId, data: playerCharData, isPlayer: true, buffs: [] });
+            const playerCard = createCharacterCard(playerId);
             if (playerCard) playerCardContainer.appendChild(playerCard);
         }
+
         const npcPartyData = JSON.parse(localStorage.getItem('npcParty')) || [];
-        npcPartyData.forEach(npcData => {
+        npcPartyData.forEach((npcData, index) => {
             if (npcData) {
-                const npcCard = createCharacterCard(npcData);
+                const npcId = `npc-${index}-${Date.now()}`;
+                battleCharacters.push({ id: npcId, data: npcData, isPlayer: false, buffs: [] });
+                const npcCard = createCharacterCard(npcId);
                 if (npcCard) npcCardsContainer.appendChild(npcCard);
             }
         });

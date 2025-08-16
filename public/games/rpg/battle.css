@@ -25,6 +25,7 @@ body, html {
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow-y: auto; /* Make panel scrollable if content overflows */
 }
 
 #center-panel {
@@ -108,14 +109,14 @@ body, html {
     font-family: 'Cinzel', serif; /* Assuming this font is used, might need to import */
 }
 
-#player-character-card, #npc-character-cards, #tactic-items {
-    margin-top: 20px;
+#player-character-card, #npc-character-cards {
     width: 100%;
 }
 
 #player-character-card {
     display: flex;
     justify-content: center;
+    /* margin-top removed to shift cards up */
 }
 
 #npc-character-cards {
@@ -123,49 +124,102 @@ body, html {
     flex-direction: column;
     gap: 10px;
     align-items: center;
+    margin-top: 10px; /* Reduced margin */
 }
 
 .char-card {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    gap: 5px;
     border: 2px solid #8a6d4f;
     background: rgba(40, 30, 30, 0.85);
     padding: 10px;
     margin-bottom: 10px;
-    width: 95%; /* Make card wider */
     box-sizing: border-box;
+    align-items: center;
+}
+
+.char-top-section {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
 }
 
 .char-card img {
-    width: 80px;  /* Slightly smaller image */
+    width: 80px;
     height: 80px;
     object-fit: cover;
-    object-position: center 15%; /* Shifts the image down to prevent cutting off the top */
+    object-position: center 15%;
     border: 2px solid #c9b037;
+    flex-shrink: 0;
 }
 
 .char-card-info {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
+    width: 100%;
 }
 
 .char-card h3 {
-    margin: 0 0 5px 0;
-    font-size: 1.1em;
+    margin: 0 0 8px 0;
+    font-size: 1.2em;
+    text-align: center;
+}
+
+.char-stats-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    margin-top: 5px;
+}
+
+.stat-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stat-bar {
+    flex-grow: 1;
+    height: 15px;
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.stat-bar > div {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease-in-out;
+}
+
+.health-bar {
+    background-color: #2b9d44; /* Green */
+}
+
+.mana-bar {
+    background-color: #3a7ac4; /* Blue */
+}
+
+.stat-value {
+    font-size: 0.9em;
+    font-weight: bold;
+    min-width: 50px; /* Ensure alignment */
+    text-align: right;
 }
 
 .char-drop-zone {
-    width: 90px;
-    height: 90px;
+    width: 60px;
+    height: 60px;
     border: 2px dashed rgba(255, 255, 255, 0.4);
     background-color: rgba(0, 0, 0, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0; /* Prevent the zone from shrinking */
+    flex-shrink: 0;
     transition: background-color 0.3s, border-color 0.3s;
+    box-sizing: border-box;
 }
 
 .char-drop-zone.drag-over {
@@ -176,27 +230,43 @@ body, html {
 .char-drop-zone .tactic-item {
     width: 100%;
     height: 100%;
-    padding: 5px; /* Add some padding for the contained item */
+    padding: 2px;
     box-sizing: border-box;
 }
 
 .char-drop-zone .tactic-item img {
     width: 100%;
     height: 100%;
-    border: none; /* Remove border from item image inside drop zone */
+    border: none;
     cursor: default;
+    border-radius: 5px;
+}
+
+#tactic-items-container {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px solid #8a6d4f;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 #tactic-items {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    justify-content: center;
     gap: 20px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.tactic-item {
+    /* The container for the draggable image */
 }
 
 .tactic-item img {
-    width: 120px;
-    height: 120px;
+    width: 55px;
+    height: 55px;
     border: 2px solid #c9b037;
     border-radius: 10px;
     cursor: grab;
@@ -204,4 +274,52 @@ body, html {
 
 .tactic-item img:active {
     cursor: grabbing;
+}
+
+/* --- NPC Card Specific Styles --- */
+.npc-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid #8a6d4f;
+    background: rgba(40, 30, 30, 0.85);
+    padding: 8px;
+    width: 95%; /* Match player card width for alignment */
+    box-sizing: border-box;
+    margin: 0 auto; /* Center it in the container */
+}
+
+.npc-info-section {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.npc-class {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #f5eacb;
+}
+
+.npc-card .stat-bar-container {
+    gap: 5px; /* Tighter gap */
+}
+
+.npc-card .stat-bar {
+    height: 12px; /* Shorter bars */
+}
+
+.npc-card .stat-value {
+    font-size: 0.85em;
+    min-width: 45px;
+}
+
+/* Use the existing drop-zone class, it will be a child of npc-card */
+.npc-card .char-drop-zone {
+    width: 60px; /* Same size as player's for consistency */
+    height: 60px;
+    flex-shrink: 0;
 }

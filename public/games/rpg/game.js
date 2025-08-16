@@ -1,10 +1,4 @@
-const NPC_CLASSES = {
-    'Krieger': { img: { male: '/images/RPG/Charakter/Krieger_m.png', female: '/images/RPG/Charakter/Krieger_w.png' } },
-    'Schurke': { img: { male: '/images/RPG/Charakter/Schurke_m.png', female: '/images/RPG/Charakter/Schurke_w.png' } },
-    'Bogenschütze': { img: { male: '/images/RPG/Charakter/Archer_m.png', female: '/images/RPG/Charakter/Archer_w.png' } },
-    'Magier': { img: { male: '/images/RPG/Charakter/Magier_m.png', female: '/images/RPG/Charakter/Magier_w.png' } },
-    'Heiler': { img: { male: '/images/RPG/Charakter/Heiler_m.png', female: '/images/RPG/Charakter/Heiler_w.png' } }
-};
+// Class data is now loaded from class_data.js
 
 const LOCATIONS = {
     'city_1': {
@@ -63,17 +57,7 @@ const LOCATIONS = {
     }
 };
 
-const SECRET_CLASSES = [
-    {
-        name: 'Arkaner Komponist',
-        requirements: { strength: 1, dexterity: 7, intelligence: 7 },
-        message: 'Herzlichen Glückwunsch: Du hast den Arkanen Komponisten freigeschaltet.',
-        img: {
-            male: '/images/RPG/Charakter/arkaner_m.png',
-            female: '/images/RPG/Charakter/arkaner_w.png'
-        }
-    }
-];
+// SECRET_CLASSES is now part of RPG_CLASSES in class_data.js
 
 // Game objects
 let keys = {};
@@ -256,7 +240,30 @@ function setupEventListeners() {
             }, 20);
         }, 800); // Must match animation duration
     });
-    ui.savePartyBtn.addEventListener('click', () => {
+    ui.savePartyBtn.addEventListener('click', async () => {
+        try {
+            const response = await fetch('/api/gamesaves');
+            const saveFiles = await response.json();
+
+            const container = document.getElementById('existing-saves-container');
+            container.innerHTML = ''; // Clear old list
+
+            if (saveFiles.length === 0) {
+                container.innerHTML = '<p>Noch keine Spielstände vorhanden.</p>';
+            } else {
+                const list = document.createElement('ul');
+                saveFiles.forEach(file => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'existing-save-item';
+                    listItem.textContent = file.replace('.json', '');
+                    list.appendChild(listItem);
+                });
+                container.appendChild(list);
+            }
+        } catch (error) {
+            console.error('Could not fetch existing saves:', error);
+            document.getElementById('existing-saves-container').innerHTML = '<p>Fehler beim Laden der Spielstände.</p>';
+        }
         ui.saveGameModal.style.display = 'flex';
     });
     ui.exitBtn.addEventListener('click', () => {
@@ -327,15 +334,27 @@ function setupEventListeners() {
         ui.loadGameModal.style.display = 'none';
     });
     ui.confirmSaveBtn.addEventListener('click', async () => {
-        const saveName = ui.saveNameInput.value.trim();
-        if (saveName.length < 3 || !/^[a-zA-Z0-9_ -]+$/.test(saveName)) {
+        const baseName = ui.saveNameInput.value.trim();
+        if (baseName.length < 3 || !/^[a-zA-Z0-9_ -]+$/.test(baseName)) {
              alert('Bitte gib einen gültigen Namen mit mindestens 3 Zeichen ein (nur Buchstaben, Zahlen, Leerzeichen, _ und -).');
             return;
         }
 
         const charData = JSON.parse(localStorage.getItem('selectedCharacter'));
+
+        if (!charData) {
+            alert('Fehler: Kein Charakter zum Speichern ausgewählt. Bitte erstelle zuerst einen Charakter.');
+            return;
+        }
+
+        // Create a timestamp
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+
+        const finalSaveName = `${baseName}_${timestamp}`;
+
         const saveData = {
-            name: saveName,
+            name: finalSaveName, // Send the final name to the server
             character: charData,
             party: npcParty,
             location: currentLocationId
@@ -430,8 +449,10 @@ function setupGameScreen() {
 
     if (!charData) {
         charCardContainer.innerHTML = '<p>Kein Charakter ausgewählt. Bitte erstelle einen Charakter.</p>';
+        ui.savePartyBtn.disabled = true; // Disable save if no character
         return;
     }
+    ui.savePartyBtn.disabled = false; // Enable save if character exists
 
     charCardContainer.innerHTML = `
         <div class="character-card-game">
@@ -458,12 +479,15 @@ function setupNpcSelection() {
         card.className = 'npc-card';
 
         let options = '<option value="">- Klasse wählen -</option>';
-        for (const className in NPC_CLASSES) {
-            options += `<option value="${className}">${className}</option>`;
+        for (const className in RPG_CLASSES) {
+            // Don't include the custom character option for NPCs
+            if (className !== 'Eigener Charakter') {
+                options += `<option value="${className}">${className}</option>`;
+            }
         }
 
         const savedNpc = npcParty[i];
-        const imgSrc = savedNpc ? NPC_CLASSES[savedNpc.className].img[savedNpc.gender] : '/images/RPG/Charakter/male_silhouette.svg';
+        const imgSrc = savedNpc && RPG_CLASSES[savedNpc.className] ? RPG_CLASSES[savedNpc.className].img[savedNpc.gender] : '/images/RPG/Charakter/male_silhouette.svg';
 
         card.innerHTML = `
             <img src="${imgSrc}" alt="NPC ${i + 1}">
@@ -472,6 +496,10 @@ function setupNpcSelection() {
                 <select class="npc-class-select" data-slot="${i}">
                     ${options}
                 </select>
+                <div class="gender-selector">
+                    <button class="gender-btn active" data-gender="male"><img src="/images/RPG/Charakter/M.png" alt="Männlich"></button>
+                    <button class="gender-btn" data-gender="female"><img src="/images/RPG/Charakter/F.png" alt="Weiblich"></button>
+                </div>
             </div>
         `;
         npcContainer.appendChild(card);
@@ -481,29 +509,42 @@ function setupNpcSelection() {
         }
     }
 
-    const npcSelects = document.querySelectorAll('.npc-class-select');
-    npcSelects.forEach(select => {
-        select.addEventListener('change', (event) => {
-            const selectedClass = event.target.value;
-            const slot = parseInt(event.target.dataset.slot, 10);
-            const card = event.target.closest('.npc-card');
-            const img = card.querySelector('img');
+    document.querySelectorAll('.npc-card').forEach((card, i) => {
+        const select = card.querySelector('.npc-class-select');
+        const img = card.querySelector('img');
+        const genderButtons = card.querySelectorAll('.gender-btn');
 
-            if (selectedClass && NPC_CLASSES[selectedClass]) {
-                // For now, let's assume a default gender, e.g., 'male'
-                const gender = 'male';
-                const npcData = NPC_CLASSES[selectedClass];
-                img.src = npcData.img[gender];
-                // Create a full character object for the NPC
-                npcParty[slot] = {
+        const updateNpc = () => {
+            const selectedClass = select.value;
+            const activeGenderBtn = card.querySelector('.gender-btn.active');
+            const gender = activeGenderBtn ? activeGenderBtn.dataset.gender : 'male';
+
+            if (selectedClass && RPG_CLASSES[selectedClass]) {
+                const classData = RPG_CLASSES[selectedClass];
+                img.src = classData.img[gender];
+
+                npcParty[i] = {
                     name: selectedClass,
-                    image: npcData.img[gender],
-                    // We can add stats here later if needed
+                    class: selectedClass,
+                    image: classData.img[gender],
+                    stats: classData.stats,
+                    hp: 100, maxHp: 100, mana: 100, maxMana: 100,
+                    gender: gender
                 };
             } else {
                 img.src = '/images/RPG/Charakter/male_silhouette.svg';
-                npcParty[slot] = null; // Clear selection
+                npcParty[i] = null;
             }
+        };
+
+        select.addEventListener('change', updateNpc);
+
+        genderButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                card.querySelector('.gender-btn.active').classList.remove('active');
+                button.classList.add('active');
+                updateNpc();
+            });
         });
     });
 }
@@ -697,44 +738,52 @@ function handleConfirmCustomChar() {
     }
 
     customCharState.name = charName;
-    console.log('Custom character created:', customCharState);
-
     const customCard = document.querySelector('.character-card[data-iscustom="true"]');
+    const selectedGender = customCard.dataset.gender;
+
+    let finalClass = 'Custom';
+    let finalImage = selectedGender === 'male' ? '/images/RPG/Charakter/male_silhouette.svg' : '/images/RPG/Charakter/female_silhouette.svg';
 
     // Check for secret class unlock
-    let unlockedClass = null;
-    for (const secretClass of SECRET_CLASSES) {
-        const reqs = secretClass.requirements;
+    if (RPG_CLASSES['Arkaner Komponist']) {
+        const secretClassData = RPG_CLASSES['Arkaner Komponist'];
+        const reqs = secretClassData.stats;
         const stats = customCharState.stats;
-        if (stats.strength === reqs.strength &&
-            stats.dexterity === reqs.dexterity &&
-            stats.intelligence === reqs.intelligence) {
-            unlockedClass = secretClass;
-            break;
+        if (stats.strength === reqs.strength && stats.dexterity === reqs.dexterity && stats.intelligence === reqs.intelligence) {
+            finalClass = 'Arkaner Komponist';
+            finalImage = secretClassData.img[selectedGender];
+            alert('Herzlichen Glückwunsch: Du hast den Arkanen Komponisten freigeschaltet.');
         }
     }
 
-    if (customCard) {
-        customCard.querySelector('h3').textContent = customCharState.name;
+    const charData = {
+        name: customCharState.name,
+        class: finalClass,
+        image: finalImage,
+        stats: customCharState.stats,
+        gender: selectedGender
+    };
 
-        if (unlockedClass) {
-            alert(unlockedClass.message);
-            const selectedGender = customCard.dataset.gender;
-            customCard.querySelector('img').src = unlockedClass.img[selectedGender];
+    if (window.opener) {
+        window.opener.postMessage({ type: 'character-selected', data: charData }, '*');
+        // window.close(); // Removed as per user request
+    } else {
+        localStorage.setItem('selectedCharacter', JSON.stringify(charData));
+        if (customCard) {
+            customCard.querySelector('h3').textContent = charData.name;
+            customCard.querySelector('img').src = charData.image;
+            document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
+            customCard.classList.add('selected');
         }
-
-        customCard.querySelectorAll('.gender-btn').forEach(btn => btn.disabled = true);
-
-        document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
-        customCard.classList.add('selected');
+        ui.startGameBtn.disabled = false;
     }
 
     closeCustomCharModal();
-    ui.startGameBtn.disabled = false;
 }
 
 // --- Naming Modal Functions ---
-function openNameCharModal(classData, card) {
+function openNameCharModal(className, card) {
+    const classData = RPG_CLASSES[className];
     namingContext = { classData, card };
     ui.predefCharNameInput.value = '';
     ui.nameCharModal.style.display = 'flex';
@@ -752,20 +801,26 @@ function handleConfirmPredefName() {
         alert('Bitte gib einen Namen mit mindestens 3 Zeichen ein.');
         return;
     }
-
     if (!namingContext) return;
 
     const { classData, card } = namingContext;
+    const selectedGender = card.dataset.gender;
     const charData = {
         name: charName,
-        image: classData.img[card.dataset.gender],
-        stats: classData.stats
+        class: classData.name,
+        image: classData.img[selectedGender],
+        stats: classData.stats,
+        gender: selectedGender
     };
 
     if (window.opener) {
         window.opener.postMessage({ type: 'character-selected', data: charData }, '*');
+        // window.close(); // Removed as per user request
     } else {
-        alert('Hauptfenster nicht gefunden. Charakterauswahl kann nicht gesendet werden.');
+        // Fallback for when the page is not opened as a popup
+        localStorage.setItem('selectedCharacter', JSON.stringify(charData));
+        alert(`${charData.name} wurde ausgewählt!`);
+        ui.startGameBtn.disabled = false;
     }
 
     closeNameCharModal();
@@ -773,55 +828,14 @@ function handleConfirmPredefName() {
 
 
 function populateCharacterCreation() {
-    const classes = [
-        {
-            name: 'Krieger',
-            description: 'Stark und widerstandsfähig, ein Meister des Nahkampfes.',
-            stats: { strength: 8, dexterity: 4, intelligence: 3 },
-            img: { male: '/images/RPG/Charakter/Krieger_m.png', female: '/images/RPG/Charakter/Krieger_w.png' }
-        },
-        {
-            name: 'Magier',
-            description: 'Beherrscht die arkanen Künste, um Feinde aus der Ferne zu vernichten.',
-            stats: { strength: 2, dexterity: 5, intelligence: 8 },
-            img: { male: '/images/RPG/Charakter/Magier_m.png', female: '/images/RPG/Charakter/Magier_w.png' }
-        },
-        {
-            name: 'Schurke',
-            description: 'Ein listiger Kämpfer, der aus den Schatten zuschlägt.',
-            stats: { strength: 4, dexterity: 8, intelligence: 3 },
-            img: { male: '/images/RPG/Charakter/Schurke_m.png', female: '/images/RPG/Charakter/Schurke_w.png' }
-        },
-        {
-            name: 'Bogenschütze',
-            description: 'Ein Meisterschütze mit Pfeil und Bogen.',
-            stats: { strength: 4, dexterity: 8, intelligence: 3 },
-            img: { male: '/images/RPG/Charakter/Archer_m.png', female: '/images/RPG/Charakter/Archer_w.png' }
-        },
-        {
-            name: 'Heiler',
-            description: 'Ein heiliger Kleriker, der Verbündete heilt und schützt.',
-            stats: { strength: 3, dexterity: 4, intelligence: 8 },
-            img: { male: '/images/RPG/Charakter/Heiler_m.png', female: '/images/RPG/Charakter/Heiler_w.png' }
-        },
-        {
-            name: 'Eigener Charakter',
-            description: 'Erstelle einen Charakter mit frei verteilbaren Attributpunkten.',
-            isCustom: true,
-            img: { male: '/images/RPG/Charakter/male_silhouette.svg', female: '/images/RPG/Charakter/female_silhouette.svg' }
-        }
-    ];
-
     const container = document.getElementById('character-cards-container');
-    container.innerHTML = ''; // Clear previous cards
+    container.innerHTML = '';
 
-    classes.forEach(classData => {
+    const createClassCard = (className, classData) => {
         const card = document.createElement('div');
         card.className = 'character-card';
         card.dataset.gender = 'male';
-        if (classData.isCustom) {
-            card.dataset.iscustom = 'true';
-        }
+        card.dataset.className = className;
 
         let statsHtml = '';
         if (classData.stats) {
@@ -835,76 +849,59 @@ function populateCharacterCreation() {
         }
 
         card.innerHTML = `
-            <img src="${classData.img.male}" alt="${classData.name}">
-            <h3>${classData.name}</h3>
+            <img src="${classData.img.male}" alt="${className}">
+            <h3>${className}</h3>
             <p>${classData.description}</p>
             ${statsHtml}
             <div class="gender-selector">
-                <button class="gender-btn active" data-gender="male">Männlich</button>
-                <button class="gender-btn" data-gender="female">Weiblich</button>
+                <button class="gender-btn active" data-gender="male"><img src="/images/RPG/Charakter/M.png" alt="Männlich"></button>
+                <button class="gender-btn" data-gender="female"><img src="/images/RPG/Charakter/F.png" alt="Weiblich"></button>
             </div>
-            <button class="btn-apply-char">Übernehmen</button>
         `;
 
-        // Event listener for selecting the class card
         card.addEventListener('click', () => {
-            if (classData.isCustom) {
-                openCustomCharModal();
-            } else {
-                document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-                ui.startGameBtn.disabled = false;
-            }
+            document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            openNameCharModal(className, card);
         });
 
-        // Event listeners for gender selection buttons
         const genderButtons = card.querySelectorAll('.gender-btn');
         genderButtons.forEach(button => {
             button.addEventListener('click', (event) => {
-                event.stopPropagation(); // Prevent card selection when clicking gender
-
+                event.stopPropagation();
                 const selectedGender = button.dataset.gender;
                 card.dataset.gender = selectedGender;
-
                 card.querySelector('.gender-btn.active').classList.remove('active');
                 button.classList.add('active');
-
-                const imgElement = card.querySelector('img');
-                imgElement.src = classData.img[selectedGender];
+                card.querySelector('img').src = classData.img[selectedGender];
             });
         });
 
-        // Event listener for the apply button
-        const applyBtn = card.querySelector('.btn-apply-char');
-        applyBtn.addEventListener('click', (event) => {
-            event.stopPropagation();
+        return card;
+    };
 
-            if (classData.isCustom) {
-                // For custom characters, confirmation happens inside the modal.
-                // This button acts as a final "send to main screen" after confirmation.
-                if (!customCharState.name) {
-                    alert('Bitte erstelle zuerst deinen Charakter über das Modal.');
-                    openCustomCharModal(); // Re-open if they haven't confirmed
-                    return;
-                }
-                const charData = {
-                    name: customCharState.name,
-                    image: card.querySelector('img').src,
-                    stats: customCharState.stats
-                };
-                if (window.opener) {
-                    window.opener.postMessage({ type: 'character-selected', data: charData }, '*');
-                } else {
-                    alert('Hauptfenster nicht gefunden.');
-                }
-            } else {
-                // For predefined classes, open the naming modal.
-                openNameCharModal(classData, card);
-            }
-        });
+    for (const className in RPG_CLASSES) {
+        container.appendChild(createClassCard(className, RPG_CLASSES[className]));
+    }
 
-        container.appendChild(card);
+    const customCard = document.createElement('div');
+    customCard.className = 'character-card';
+    customCard.dataset.iscustom = 'true';
+    customCard.innerHTML = `
+        <img src="/images/RPG/Charakter/male_silhouette.svg" alt="Eigener Charakter">
+        <h3>Eigener Charakter</h3>
+        <p>Erstelle einen Charakter mit frei verteilbaren Attributpunkten.</p>
+        <div class="gender-selector">
+            <button class="gender-btn active" data-gender="male"><img src="/images/RPG/Charakter/M.png" alt="Männlich"></button>
+            <button class="gender-btn" data-gender="female"><img src="/images/RPG/Charakter/F.png" alt="Weiblich"></button>
+        </div>
+    `;
+    customCard.addEventListener('click', () => {
+        document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
+        customCard.classList.add('selected');
+        openCustomCharModal();
     });
+    container.appendChild(customCard);
 }
 
 

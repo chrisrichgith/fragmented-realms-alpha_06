@@ -1,0 +1,61 @@
+{
+  "character": {
+    "name": "Hannes",
+    "image": "/images/RPG/Charakter/Krieger_m_p.png",
+    "stats": {
+      "strength": 8,
+      "dexterity": 4,
+      "intelligence": 3
+    },
+    "gender": "male"
+  },
+  "party": [
+    {
+      "name": "Heiler",
+      "class": "Heiler",
+      "image": "/images/RPG/Charakter/Heiler_w_p.png",
+      "stats": {
+        "strength": 3,
+        "dexterity": 4,
+        "intelligence": 8
+      },
+      "hp": 100,
+      "maxHp": 100,
+      "mana": 100,
+      "maxMana": 100,
+      "gender": "female"
+    },
+    {
+      "name": "Magier",
+      "class": "Magier",
+      "image": "/images/RPG/Charakter/Magier_m_p.png",
+      "stats": {
+        "strength": 2,
+        "dexterity": 5,
+        "intelligence": 8
+      },
+      "hp": 100,
+      "maxHp": 100,
+      "mana": 100,
+      "maxMana": 100,
+      "gender": "male"
+    },
+    {
+      "name": "Arkaner Komponist",
+      "class": "Arkaner Komponist",
+      "image": "/images/RPG/Charakter/arkaner_m_p.png",
+      "stats": {
+        "strength": 1,
+        "dexterity": 7,
+        "intelligence": 7
+      },
+      "hp": 100,
+      "maxHp": 100,
+      "mana": 100,
+      "maxMana": 100,
+      "gender": "male"
+    }
+  ],
+  "location": null,
+  "savedAt": "2025-08-16T18:19:43.477Z"
+}
