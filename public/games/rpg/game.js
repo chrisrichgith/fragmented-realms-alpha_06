@@ -12,6 +12,7 @@ const LOCATIONS = {
     'village_9': { name: 'Kragmoor', coords: { top: '26.54%', left: '80.27%', width: '8%', height: '8%' }, detailMap: '/images/RPG/Maps/Villagemap.png', actions: ['quest', 'rest'] }
 };
 
+
 // Game objects
 let keys = {};
 
@@ -63,6 +64,7 @@ function init() {
 
         // Game Screen Elements
         gameCharacterCardContainer: document.getElementById('game-character-card-container'),
+        npcSelectionContainer: document.getElementById('npc-selection-container'),
     };
     
     setupEventListeners();
@@ -94,10 +96,6 @@ function setupEventListeners() {
     });
 
     ui.newGameBtn.addEventListener('click', () => showScreen('character-creation'));
-    ui.optionsBtn.addEventListener('click', () => showScreen('options'));
-    document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
-    ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
-
     ui.startGameDirektBtn.addEventListener('click', () => {
         const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
         if (characterData) {
@@ -106,6 +104,9 @@ function setupEventListeners() {
             alert('Bitte erstelle zuerst einen Charakter im Menü "Charakter erstellen".');
         }
     });
+    ui.optionsBtn.addEventListener('click', () => showScreen('options'));
+    document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
+    ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
 
     // New Creation Screen Listeners
     if (ui.creationScreen) {
@@ -255,6 +256,107 @@ function startGame(characterData) {
         </div>
     `;
     ui.gameCharacterCardContainer.innerHTML = card;
+
+    npcParty = [null, null, null]; // Reset party
+    displayNpcs();
+}
+
+function displayNpcs() {
+    if (!ui.npcSelectionContainer) return;
+
+    ui.npcSelectionContainer.innerHTML = ''; // Clear existing NPCs
+
+    for (let i = 0; i < 3; i++) {
+        const npcCard = document.createElement('div');
+        npcCard.className = 'npc-card';
+        npcCard.dataset.index = i;
+
+        const portrait = document.createElement('img');
+        portrait.src = '/images/RPG/Charakter/male_silhouette.svg';
+        portrait.alt = `NPC ${i + 1}`;
+
+        const details = document.createElement('div');
+        details.className = 'npc-card-details';
+
+        const classSelect = document.createElement('select');
+        classSelect.className = 'npc-class-select';
+        classSelect.innerHTML = '<option value="">- Klasse -</option>';
+        for (const className in RPG_CLASSES) {
+            if (RPG_CLASSES[className].playable === false) continue;
+            classSelect.appendChild(new Option(className, className));
+        }
+
+        const genderSelector = document.createElement('div');
+        genderSelector.className = 'gender-selector';
+
+        const maleButton = document.createElement('button');
+        maleButton.className = 'gender-btn active';
+        maleButton.dataset.gender = 'male';
+        maleButton.innerHTML = '<img src="/images/RPG/Charakter/male_silhouette.svg" alt="Männlich">';
+
+        const femaleButton = document.createElement('button');
+        femaleButton.className = 'gender-btn';
+        femaleButton.dataset.gender = 'female';
+        femaleButton.innerHTML = '<img src="/images/RPG/Charakter/female_silhouette.svg" alt="Weiblich">';
+
+        genderSelector.appendChild(maleButton);
+        genderSelector.appendChild(femaleButton);
+
+        details.appendChild(classSelect);
+        details.appendChild(genderSelector);
+
+        npcCard.appendChild(portrait);
+        npcCard.appendChild(details);
+
+        ui.npcSelectionContainer.appendChild(npcCard);
+
+        // Add event listeners
+        classSelect.addEventListener('change', () => updateNpcCard(i));
+        genderSelector.addEventListener('click', (e) => {
+            const button = e.target.closest('.gender-btn');
+            if (button && !button.classList.contains('active')) {
+                genderSelector.querySelector('.active').classList.remove('active');
+                button.classList.add('active');
+                updateNpcCard(i);
+            }
+        });
+
+        // Initial update
+        updateNpcCard(i);
+    }
+}
+
+function updateNpcCard(index) {
+    const npcCard = ui.npcSelectionContainer.querySelector(`.npc-card[data-index='${index}']`);
+    if (!npcCard) return;
+
+    const classSelect = npcCard.querySelector('.npc-class-select');
+    const activeGenderBtn = npcCard.querySelector('.gender-btn.active');
+
+    const className = classSelect.value;
+    const gender = activeGenderBtn.dataset.gender;
+
+    const classData = RPG_CLASSES[className];
+    let portraitPath = `/images/RPG/Charakter/${gender}_silhouette.svg`;
+
+    if (classData) {
+        const genderSuffix = gender === 'male' ? 'm' : 'w';
+        const portraitFileName = `${classData.imgName}_${genderSuffix}.png`;
+        portraitPath = `/images/RPG/Charakter/${portraitFileName}`;
+
+        npcParty[index] = {
+            class: className,
+            gender: gender,
+            stats: classData.stats,
+            abilities: classData.abilities,
+            image: portraitPath
+        };
+    } else {
+        npcParty[index] = null;
+    }
+
+    const portrait = npcCard.querySelector('img');
+    portrait.src = portraitPath;
 }
 
 window.onload = init;
