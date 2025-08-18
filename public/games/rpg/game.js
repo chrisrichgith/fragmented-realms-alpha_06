@@ -307,6 +307,7 @@ function confirmCharacter() {
     // For now, log to console and save to localStorage
     console.log("Character Confirmed:", finalCharData);
     localStorage.setItem('selectedCharacter', JSON.stringify(finalCharData));
+    socket.emit('character:save', finalCharData);
 
     startGame(finalCharData);
 }
