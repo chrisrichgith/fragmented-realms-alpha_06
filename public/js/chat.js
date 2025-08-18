@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isAdmin = false;
     let sendToTarget = null;
     let characterIsSelected = false;
-    let rpgWindow = null;
+    let currentInvitation = null;
+    let currentParty = [];
 
     // --- Configs ---
     const GAMES_CONFIG = {
@@ -38,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeAdminPanel = document.getElementById('closeAdminPanel');
     const sendResourcesModal = document.getElementById('sendResourcesModal');
     const closeSendResourcesModal = document.getElementById('closeSendResourcesModal');
+    const invitationModal = document.getElementById('invitation-modal');
+    const invitationText = document.getElementById('invitation-text');
+    const invitationAcceptBtn = document.getElementById('invitation-accept-btn');
+    const invitationDeclineBtn = document.getElementById('invitation-decline-btn');
 
     // Admin Panel Elements
     const userSelect = document.getElementById('userSelect');
@@ -74,6 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const charDexterity = document.getElementById('charDexterity');
     const charIntelligence = document.getElementById('charIntelligence');
     const startRpgBtn = document.getElementById('startRpgBtn');
+    const partyList = document.getElementById('partyList');
+    const startPartyRpgBtn = document.getElementById('startPartyRpgBtn');
 
 
     // --- Tabbed Form ---
@@ -193,7 +200,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('login success', (data) => {
         currentUser = data.username;
-        localStorage.setItem('username', currentUser);
         isAdmin = data.isAdmin;
         loginOverlay.style.display = 'none';
         userInfo.textContent = `Angemeldet als: ${currentUser}`;
@@ -281,37 +287,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('user list', (users) => {
         userList.innerHTML = '';
-        users.forEach(username => {
+        users.forEach(user => {
             const userElement = document.createElement('li');
             const nameSpan = document.createElement('span');
-            nameSpan.textContent = username;
+            nameSpan.textContent = user.username;
             userElement.appendChild(nameSpan);
 
-            if (username === currentUser) {
+            if (user.username === currentUser) {
                 userElement.style.fontWeight = 'bold';
             }
 
             const controlsDiv = document.createElement('div');
             controlsDiv.className = 'player-controls';
 
-            if (username !== currentUser) {
+            if (user.username !== currentUser) {
                 const sendBtn = document.createElement('button');
                 sendBtn.textContent = 'Senden';
                 sendBtn.className = 'send-res-btn';
-                sendBtn.dataset.username = username;
+                sendBtn.dataset.username = user.username;
                 controlsDiv.appendChild(sendBtn);
+
+                if (user.hasRpgChar) {
+                    const inviteBtn = document.createElement('button');
+                    inviteBtn.textContent = 'Invite';
+                    inviteBtn.className = 'invite-btn';
+                    inviteBtn.dataset.username = user.username;
+                    controlsDiv.appendChild(inviteBtn);
+                }
             }
 
-            if (isAdmin && username !== currentUser) {
+            if (isAdmin && user.username !== currentUser) {
                 const kickBtn = document.createElement('button');
                 kickBtn.textContent = 'Kick';
                 kickBtn.className = 'kick-btn';
-                kickBtn.dataset.username = username;
+                kickBtn.dataset.username = user.username;
 
                 const banBtn = document.createElement('button');
                 banBtn.textContent = 'Ban';
                 banBtn.className = 'ban-btn';
-                banBtn.dataset.username = username;
+                banBtn.dataset.username = user.username;
 
                 controlsDiv.appendChild(kickBtn);
                 controlsDiv.appendChild(banBtn);
@@ -342,6 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sendToTarget = username;
             sendToUserSpan.textContent = username;
             sendResourcesModal.style.display = 'flex';
+        } else if (target.classList.contains('invite-btn')) {
+            socket.emit('rpg:invite-player', username);
         }
     });
 
@@ -356,8 +372,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     startRpgBtn.addEventListener('click', () => {
-        const url = `/games/rpg/index.html?username=${currentUser}`;
-        rpgWindow = window.open(url, '_blank');
+        const url = '/games/rpg/index.html';
+        window.open(url, '_blank');
+    });
+
+    startPartyRpgBtn.addEventListener('click', () => {
+        socket.emit('rpg:start-party-game');
     });
 
     if (adminPanelBtn) {
@@ -509,74 +529,91 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(`Level Up fehlgeschlagen: ${data.message}`);
     });
 
-    socket.on('rpg:invitable-players-list', (players) => {
-        if (rpgWindow) {
-            rpgWindow.postMessage({ type: 'rpg:invitable-players-list', payload: players }, '*');
+    socket.on('rpg:receive-invitation', ({ from }) => {
+        currentInvitation = { from };
+        invitationText.textContent = `Du hast eine RPG-Einladung von ${from} erhalten.`;
+        invitationModal.style.display = 'flex';
+    });
+
+    socket.on('rpg:party-update', ({ party }) => {
+        currentParty = party;
+        partyList.innerHTML = '';
+        party.forEach(member => {
+            const li = document.createElement('li');
+            li.textContent = member;
+            partyList.appendChild(li);
+        });
+
+        if (party.length > 1 && party[0] === currentUser) {
+            startPartyRpgBtn.style.display = 'block';
+        } else {
+            startPartyRpgBtn.style.display = 'none';
         }
     });
 
-    socket.on('rpg:receive-invitation', (data) => {
-        if (rpgWindow) {
-            rpgWindow.postMessage({ type: 'rpg:receive-invitation', payload: data }, '*');
+    socket.on('rpg:launch-game', ({ party }) => {
+        const partyData = JSON.stringify(party);
+        const url = `/games/rpg/index.html?party=${encodeURIComponent(partyData)}`;
+        window.open(url, '_blank');
+    });
+
+    invitationAcceptBtn.addEventListener('click', () => {
+        if (currentInvitation) {
+            socket.emit('rpg:respond-to-invitation', { from: currentInvitation.from, response: 'accepted' });
+            invitationModal.style.display = 'none';
+            currentInvitation = null;
         }
     });
 
-    socket.on('rpg:party-update', (data) => {
-        if (rpgWindow) {
-            rpgWindow.postMessage({ type: 'rpg:party-update', payload: data }, '*');
-        }
-    });
-
-    socket.on('rpg:join-party-success', (data) => {
-        if (rpgWindow) {
-            rpgWindow.postMessage({ type: 'rpg:join-party-success', payload: data }, '*');
+    invitationDeclineBtn.addEventListener('click', () => {
+        if (currentInvitation) {
+            socket.emit('rpg:respond-to-invitation', { from: currentInvitation.from, response: 'declined' });
+            invitationModal.style.display = 'none';
+            currentInvitation = null;
         }
     });
 
     window.addEventListener('message', (event) => {
-        if (!event.data || !event.data.type) return;
+        if (!event.data) return;
 
-        switch (event.data.type) {
-            case 'game:score':
-                socket.emit('game:submit-score', event.data.payload);
-                break;
-            case 'party:save':
-                socket.emit('party:save', event.data.payload);
-                break;
-            case 'character-selected':
-                const charData = event.data.data;
-                localStorage.setItem('selectedCharacter', JSON.stringify(charData));
-                console.log('Received character data:', charData);
+        // Handle score submissions from games
+        if (event.data.type === 'game:score') {
+            socket.emit('game:submit-score', event.data.payload);
+        }
 
-                const portraitEl = document.getElementById('char-portrait');
-                const nameEl = document.getElementById('char-name');
+        // Handle party save from RPG
+        if (event.data.type === 'party:save') {
+            socket.emit('party:save', event.data.payload);
+            return; // Done with this event
+        }
 
-                if (portraitEl) {
-                    portraitEl.src = charData.image;
-                }
-                if (nameEl && charData.name) {
-                    nameEl.textContent = charData.name;
-                }
-                if (charData.stats) {
-                    charStrength.textContent = charData.stats.strength;
-                    charDexterity.textContent = charData.stats.dexterity;
-                    charIntelligence.textContent = charData.stats.intelligence;
-                }
+        // Handle character selection from RPG
+        if (event.data.type === 'character-selected') {
+            const charData = event.data.data;
+            localStorage.setItem('selectedCharacter', JSON.stringify(charData));
+            console.log('Received character data:', charData);
 
-                characterIsSelected = true;
-                startRpgBtn.textContent = 'Spiel fortsetzen';
+            const portraitEl = document.getElementById('char-portrait');
+            const nameEl = document.getElementById('char-name');
 
-                socket.emit('character:save', charData);
-                break;
-            case 'rpg:get-invitable-players':
-                socket.emit('rpg:get-invitable-players');
-                break;
-            case 'rpg:invite-player':
-                socket.emit('rpg:invite-player', event.data.payload);
-                break;
-            case 'rpg:respond-to-invitation':
-                socket.emit('rpg:respond-to-invitation', event.data.payload);
-                break;
+            if (portraitEl) {
+                portraitEl.src = charData.image;
+            }
+            if (nameEl && charData.name) {
+                nameEl.textContent = charData.name;
+            }
+            if (charData.stats) {
+                charStrength.textContent = charData.stats.strength;
+                charDexterity.textContent = charData.stats.dexterity;
+                charIntelligence.textContent = charData.stats.intelligence;
+            }
+
+            // Set state for direct game start
+            characterIsSelected = true;
+            startRpgBtn.textContent = 'Spiel fortsetzen';
+
+            // Also save the character data to the server
+            socket.emit('character:save', charData);
         }
     });
 });

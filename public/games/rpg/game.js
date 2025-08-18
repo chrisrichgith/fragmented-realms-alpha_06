@@ -12,17 +12,12 @@ const LOCATIONS = {
     'village_9': { name: 'Kragmoor', coords: { top: '26.54%', left: '80.27%', width: '8%', height: '8%' }, detailMap: '/images/RPG/Maps/Villagemap.png', actions: ['quest', 'rest'] }
 };
 
-
-// Game objects
-let keys = {};
-
 // UI Elements
 let ui = {};
 
 // Party state
-let npcParty = [null, null, null];
+let partyData = [];
 let currentLocationId = null;
-let currentInvitation = null;
 
 // Character creation state
 let creationState = {
@@ -33,12 +28,6 @@ let creationState = {
 
 // Initialize game
 function init() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const username = urlParams.get('username');
-    if (username) {
-        localStorage.setItem('username', username);
-    }
-
     // Populate UI object
     ui = {
         // Screens
@@ -50,7 +39,6 @@ function init() {
 
         // Buttons
         newGameBtn: document.getElementById('new-game-btn'),
-        startGameDirektBtn: document.getElementById('start-game-direkt-btn'),
         optionsBtn: document.getElementById('options-btn'),
         creationBackBtn: document.getElementById('creation-back-btn'),
         confirmCreationBtn: document.getElementById('confirm-creation-btn'),
@@ -82,20 +70,20 @@ function init() {
         questScrollModal: document.getElementById('quest-scroll-modal'),
         questAcceptBtn: document.getElementById('quest-accept-btn'),
         questDeclineBtn: document.getElementById('quest-decline-btn'),
-        invitablePlayersList: document.getElementById('invitable-players-list'),
-        invitationModal: document.getElementById('invitation-modal'),
-        invitationText: document.getElementById('invitation-text'),
-        invitationAcceptBtn: document.getElementById('invitation-accept-btn'),
-        invitationDeclineBtn: document.getElementById('invitation-decline-btn'),
     };
     
     setupEventListeners();
     initCharacterCreationScreen();
     
-    if (urlParams.get('action') === 'continue') {
-        const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
-        if (characterData) {
-            startGame(characterData);
+    const urlParams = new URLSearchParams(window.location.search);
+    const partyParam = urlParams.get('party');
+
+    if (partyParam) {
+        partyData = JSON.parse(decodeURIComponent(partyParam));
+        const username = localStorage.getItem('username');
+        const myCharacter = partyData.find(p => p.username === username)?.character;
+        if (myCharacter) {
+            startGame(myCharacter);
         } else {
             showScreen('title');
         }
@@ -117,70 +105,10 @@ function setupEventListeners() {
     });
 
     ui.newGameBtn.addEventListener('click', () => showScreen('character-creation'));
-    ui.startGameDirektBtn.addEventListener('click', () => {
-        const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
-        if (characterData) {
-            startGame(characterData);
-        } else {
-            alert('Bitte erstelle zuerst einen Charakter im Menü "Charakter erstellen".');
-        }
-    });
     ui.optionsBtn.addEventListener('click', () => showScreen('options'));
     document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
     ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
 
-    window.addEventListener('message', (event) => {
-        if (!event.data || !event.data.type) return;
-
-        switch (event.data.type) {
-            case 'rpg:invitable-players-list':
-                ui.invitablePlayersList.innerHTML = '';
-                event.data.payload.forEach(player => {
-                    const playerEl = document.createElement('div');
-                    playerEl.className = 'invitable-player';
-                    playerEl.innerHTML = `
-                        <span>${player}</span>
-                        <button class="invite-btn" data-username="${player}">Invite</button>
-                    `;
-                    playerEl.querySelector('.invite-btn').addEventListener('click', (e) => {
-                        const username = e.target.dataset.username;
-                        window.opener.postMessage({ type: 'rpg:invite-player', payload: username }, '*');
-                    });
-                    ui.invitablePlayersList.appendChild(playerEl);
-                });
-                break;
-            case 'rpg:receive-invitation':
-                currentInvitation = { from: event.data.payload.from };
-                ui.invitationText.textContent = `You have received an invitation from ${event.data.payload.from}.`;
-                ui.invitationModal.style.display = 'flex';
-                break;
-            case 'rpg:party-update':
-                updatePartyView(event.data.payload.party);
-                break;
-            case 'rpg:join-party-success':
-                showScreen('game');
-                updatePartyView(event.data.payload.party);
-                break;
-        }
-    });
-
-    ui.invitationAcceptBtn.addEventListener('click', () => {
-        if (currentInvitation) {
-            window.opener.postMessage({ type: 'rpg:respond-to-invitation', payload: { from: currentInvitation.from, response: 'accepted' } }, '*');
-            ui.invitationModal.style.display = 'none';
-            currentInvitation = null;
-        }
-    });
-
-    ui.invitationDeclineBtn.addEventListener('click', () => {
-        if (currentInvitation) {
-            window.opener.postMessage({ type: 'rpg:respond-to-invitation', payload: { from: currentInvitation.from, response: 'declined' } }, '*');
-            ui.invitationModal.style.display = 'none';
-            currentInvitation = null;
-        }
-    });
-
-    // New Creation Screen Listeners
     if (ui.creationScreen) {
         ui.questAcceptBtn.addEventListener('click', () => {
             window.location.href = 'battle.html';
@@ -222,7 +150,6 @@ function showScreen(screenId) {
         case 'character-creation':
             if (ui.characterCreationScreen) {
                 ui.characterCreationScreen.style.display = 'flex';
-                // Force a refresh of the creation screen UI when it's shown
                 updateCreationScreen();
             }
             break;
@@ -232,12 +159,10 @@ function showScreen(screenId) {
     }
 }
 
-// --- New Character Creation Logic ---
 function initCharacterCreationScreen() {
     if (!ui.creationScreen) return;
     ui.classSelect.innerHTML = '<option value="">- Klasse wählen -</option>';
     for (const className in RPG_CLASSES) {
-        // Exclude 'Eigener Charakter' or other special classes if necessary
         if (RPG_CLASSES[className].playable === false) continue;
         ui.classSelect.appendChild(new Option(className, className));
     }
@@ -260,33 +185,25 @@ function updateCreationScreen() {
     const { name, class: className, gender } = creationState;
     const classData = RPG_CLASSES[className];
 
-    // Update text displays
     if (classData) {
         ui.classDisplay.textContent = className;
         ui.classDescription.textContent = classData.description;
         const stats = classData.stats;
-        ui.statsDisplay.innerHTML = `
-            <span>STÄ: ${stats.strength}</span>
-            <span>GES: ${stats.dexterity}</span>
-            <span>INT: ${stats.intelligence}</span>
-        `;
+        ui.statsDisplay.innerHTML = `<span>STÄ: ${stats.strength}</span> <span>GES: ${stats.dexterity}</span> <span>INT: ${stats.intelligence}</span>`;
     } else {
         ui.classDisplay.textContent = 'Klasse';
         ui.classDescription.textContent = 'Wähle eine Klasse, um eine Beschreibung und die Basiswerte zu sehen.';
         ui.statsDisplay.innerHTML = '';
     }
 
-    // Update portrait
-    let portraitPath = `/images/RPG/Charakter/${gender === 'male' ? 'M' : 'F'}.png`; // Default silhouette
+    let portraitPath = `/images/RPG/Charakter/${gender === 'male' ? 'M' : 'F'}.png`;
     if (className && classData) {
         const genderSuffix = gender === 'male' ? 'm' : 'w';
-        // Use the image name from class_data.js
         const portraitFileName = `${classData.imgName}_${genderSuffix}.png`;
         portraitPath = `/images/RPG/Charakter/${portraitFileName}`;
     }
     ui.portraitDisplay.src = portraitPath;
 
-    // Update confirm button state
     if (name && name.length >= 3 && className) {
         ui.confirmCreationBtn.disabled = false;
     } else {
@@ -306,168 +223,58 @@ function confirmCharacter() {
         name,
         class: className,
         gender,
-        image: ui.portraitDisplay.src, // Get the final image path from the display
+        image: ui.portraitDisplay.src,
         stats: classData.stats,
         abilities: classData.abilities
     };
 
-    // For now, log to console and save to localStorage
-    console.log("Character Confirmed:", finalCharData);
     localStorage.setItem('selectedCharacter', JSON.stringify(finalCharData));
 
     if (window.opener) {
         window.opener.postMessage({ type: 'character-selected', data: finalCharData }, '*');
     }
 
-    startGame(finalCharData);
+    window.close();
 }
 
 function startGame(characterData) {
     showScreen('game');
 
-    // Populate character card in the game screen
-    const card = `
-        <div class="character-card-game">
-            <img src="${characterData.image}" alt="${characterData.name}">
-            <h3>${characterData.name}</h3>
-            <p>${characterData.class}</p>
-            <div class="card-stats">
-                <span>STÄ: ${characterData.stats.strength}</span>
-                <span>GES: ${characterData.stats.dexterity}</span>
-                <span>INT: ${characterData.stats.intelligence}</span>
-            </div>
-        </div>
-    `;
+    const card = `<div class="character-card-game">...</div>`; // Simplified
     ui.gameCharacterCardContainer.innerHTML = card;
 
-    npcParty = [null, null, null]; // Reset party
-    updatePartyView([]);
+    updatePartyView();
     initWorldMap();
-
-    if (window.opener) {
-        window.opener.postMessage({ type: 'rpg:get-invitable-players' }, '*');
-    }
 }
 
-function updatePartyView(party) {
+function updatePartyView() {
     if (!ui.npcSelectionContainer) return;
-
     ui.npcSelectionContainer.innerHTML = '';
-
-    const otherPlayers = party.filter(p => p !== localStorage.getItem('username'));
+    const username = localStorage.getItem('username');
+    const otherPlayers = partyData.filter(p => p.username !== username);
 
     for (let i = 0; i < 3; i++) {
-        if (i < otherPlayers.length) {
-            // Display real player
-            const player = otherPlayers[i];
+        const partyMember = otherPlayers[i];
+        if (partyMember) {
             const playerCard = document.createElement('div');
             playerCard.className = 'npc-card';
-            // TODO: Get player character data to display portrait etc.
             playerCard.innerHTML = `
-                <img src="/images/RPG/Charakter/male_silhouette.svg" alt="${player}">
+                <img src="${partyMember.character.image}" alt="${partyMember.username}">
                 <div class="npc-card-details">
-                    <h4>${player}</h4>
+                    <h4>${partyMember.username}</h4>
+                    <p>${partyMember.character.class}</p>
                 </div>
             `;
             ui.npcSelectionContainer.appendChild(playerCard);
-        } else {
-            // Display NPC slot
-            const npcCard = document.createElement('div');
-            npcCard.className = 'npc-card';
-            npcCard.dataset.index = i;
-
-            const portrait = document.createElement('img');
-            portrait.src = '/images/RPG/Charakter/M.png';
-            portrait.alt = `NPC ${i + 1}`;
-
-            const details = document.createElement('div');
-            details.className = 'npc-card-details';
-
-            const classSelect = document.createElement('select');
-            classSelect.className = 'npc-class-select';
-            classSelect.innerHTML = '<option value="">- Klasse -</option>';
-            for (const className in RPG_CLASSES) {
-                if (RPG_CLASSES[className].playable === false) continue;
-                classSelect.appendChild(new Option(className, className));
-            }
-
-            const genderSelector = document.createElement('div');
-            genderSelector.className = 'gender-selector';
-
-            const maleButton = document.createElement('button');
-            maleButton.className = 'gender-btn active';
-            maleButton.dataset.gender = 'male';
-            maleButton.innerHTML = '<img src="/images/RPG/Charakter/M.png" alt="Männlich">';
-
-            const femaleButton = document.createElement('button');
-            femaleButton.className = 'gender-btn';
-            femaleButton.dataset.gender = 'female';
-            femaleButton.innerHTML = '<img src="/images/RPG/Charakter/F.png" alt="Weiblich">';
-
-            genderSelector.appendChild(maleButton);
-            genderSelector.appendChild(femaleButton);
-
-            details.appendChild(classSelect);
-            details.appendChild(genderSelector);
-
-            npcCard.appendChild(portrait);
-            npcCard.appendChild(details);
-
-            ui.npcSelectionContainer.appendChild(npcCard);
-
-            classSelect.addEventListener('change', () => updateNpcCard(i));
-            genderSelector.addEventListener('click', (e) => {
-                const button = e.target.closest('.gender-btn');
-                if (button && !button.classList.contains('active')) {
-                    genderSelector.querySelector('.active').classList.remove('active');
-                    button.classList.add('active');
-                    updateNpcCard(i);
-                }
-            });
-
-            updateNpcCard(i);
         }
     }
-}
-
-function updateNpcCard(index) {
-    const npcCard = ui.npcSelectionContainer.querySelector(`.npc-card[data-index='${index}']`);
-    if (!npcCard) return;
-
-    const classSelect = npcCard.querySelector('.npc-class-select');
-    const activeGenderBtn = npcCard.querySelector('.gender-btn.active');
-
-    const className = classSelect.value;
-    const gender = activeGenderBtn.dataset.gender;
-
-    const classData = RPG_CLASSES[className];
-    let portraitPath = `/images/RPG/Charakter/${gender === 'male' ? 'M' : 'F'}.png`;
-
-    if (classData) {
-        const genderSuffix = gender === 'male' ? 'm' : 'w';
-        const portraitFileName = `${classData.imgName}_${genderSuffix}.png`;
-        portraitPath = `/images/RPG/Charakter/${portraitFileName}`;
-
-        npcParty[index] = {
-            class: className,
-            gender: gender,
-            stats: classData.stats,
-            abilities: classData.abilities,
-            image: portraitPath
-        };
-    } else {
-        npcParty[index] = null;
-    }
-
-    const portrait = npcCard.querySelector('img');
-    portrait.src = portraitPath;
 }
 
 function displayLocationActions(locId) {
     const location = LOCATIONS[locId];
     if (!location || !ui.locationActions) return;
 
-    ui.locationActions.innerHTML = ''; // Clear previous actions
+    ui.locationActions.innerHTML = '';
 
     location.actions.forEach(action => {
         const button = document.createElement('button');
@@ -535,7 +342,6 @@ function initWorldMap() {
         ui.locationOverlayContainer.style.display = 'block';
     });
 
-    // Show labels after a delay
     setTimeout(() => {
         if (ui.locationOverlayContainer) {
             ui.locationOverlayContainer.classList.add('active');
