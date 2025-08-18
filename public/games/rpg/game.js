@@ -396,6 +396,8 @@ function initWorldMap() {
             ui.worldMapLeft.classList.add('split');
             ui.worldMapRight.classList.add('split');
 
+            ui.locationOverlayContainer.style.display = 'none';
+
             setTimeout(() => {
                 ui.locationDetailScreen.style.display = 'block';
             }, 400);
@@ -408,6 +410,7 @@ function initWorldMap() {
         ui.locationDetailScreen.style.display = 'none';
         ui.worldMapLeft.classList.remove('split');
         ui.worldMapRight.classList.remove('split');
+        ui.locationOverlayContainer.style.display = 'block';
     });
 
     // Show labels after a delay
