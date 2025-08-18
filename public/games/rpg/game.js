@@ -198,7 +198,7 @@ function updateCreationScreen() {
     }
 
     // Update portrait
-    let portraitPath = `/images/RPG/Charakter/${gender}_silhouette.svg`; // Default silhouette
+    let portraitPath = `/images/RPG/Charakter/${gender === 'male' ? 'M' : 'F'}.png`; // Default silhouette
     if (className && classData) {
         const genderSuffix = gender === 'male' ? 'm' : 'w';
         // Use the image name from class_data.js
@@ -272,7 +272,7 @@ function displayNpcs() {
         npcCard.dataset.index = i;
 
         const portrait = document.createElement('img');
-        portrait.src = '/images/RPG/Charakter/male_silhouette.svg';
+        portrait.src = '/images/RPG/Charakter/M.png';
         portrait.alt = `NPC ${i + 1}`;
 
         const details = document.createElement('div');
@@ -292,12 +292,12 @@ function displayNpcs() {
         const maleButton = document.createElement('button');
         maleButton.className = 'gender-btn active';
         maleButton.dataset.gender = 'male';
-        maleButton.innerHTML = '<img src="/images/RPG/Charakter/male_silhouette.svg" alt="Männlich">';
+        maleButton.innerHTML = '<img src="/images/RPG/Charakter/M.png" alt="Männlich">';
 
         const femaleButton = document.createElement('button');
         femaleButton.className = 'gender-btn';
         femaleButton.dataset.gender = 'female';
-        femaleButton.innerHTML = '<img src="/images/RPG/Charakter/female_silhouette.svg" alt="Weiblich">';
+        femaleButton.innerHTML = '<img src="/images/RPG/Charakter/F.png" alt="Weiblich">';
 
         genderSelector.appendChild(maleButton);
         genderSelector.appendChild(femaleButton);
@@ -337,7 +337,7 @@ function updateNpcCard(index) {
     const gender = activeGenderBtn.dataset.gender;
 
     const classData = RPG_CLASSES[className];
-    let portraitPath = `/images/RPG/Charakter/${gender}_silhouette.svg`;
+    let portraitPath = `/images/RPG/Charakter/${gender === 'male' ? 'M' : 'F'}.png`;
 
     if (classData) {
         const genderSuffix = gender === 'male' ? 'm' : 'w';
