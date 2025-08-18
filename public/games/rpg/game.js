@@ -121,7 +121,7 @@ function setupEventListeners() {
     // New Creation Screen Listeners
     if (ui.creationScreen) {
         ui.questAcceptBtn.addEventListener('click', () => {
-            ui.questScrollModal.style.display = 'none';
+            window.location.href = 'battle.html';
         });
         ui.questDeclineBtn.addEventListener('click', () => {
             ui.questScrollModal.style.display = 'none';
