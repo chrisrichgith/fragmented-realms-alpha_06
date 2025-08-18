@@ -397,6 +397,7 @@ function initWorldMap() {
             ui.worldMapRight.classList.add('split');
 
             ui.locationOverlayContainer.style.display = 'none';
+            ui.locationDetailScreen.style.zIndex = 3;
 
             setTimeout(() => {
                 ui.locationDetailScreen.style.display = 'block';
@@ -408,6 +409,7 @@ function initWorldMap() {
 
     ui.backToWorldMapBtn.addEventListener('click', () => {
         ui.locationDetailScreen.style.display = 'none';
+        ui.locationDetailScreen.style.zIndex = 1;
         ui.worldMapLeft.classList.remove('split');
         ui.worldMapRight.classList.remove('split');
         ui.locationOverlayContainer.style.display = 'block';
