@@ -143,6 +143,15 @@ function getOnlineUsersWithStatus() {
     });
 }
 
+function emitToUser(username, event, data) {
+    const userSockets = connectedUsers.get(username);
+    if (userSockets) {
+        userSockets.forEach(socketId => {
+            io.to(socketId).emit(event, data);
+        });
+    }
+}
+
 function emitUserData(socketOrUsername, user) {
     if (!user) return; // Safety check
 
@@ -153,15 +162,10 @@ function emitUserData(socketOrUsername, user) {
         selectedCharacter: user.selectedCharacter
     };
 
-    const targetSocketId = typeof socketOrUsername === 'string'
-        ? connectedUsers.get(socketOrUsername)
-        // Note: The socket parameter is only available inside the 'connection' event.
-        // This function will throw an error if called with a socket object outside of that scope.
-        // However, the call from setInterval uses a username, so it's safe.
-        : socketOrUsername.id;
-
-    if (targetSocketId) {
-        io.to(targetSocketId).emit('user data', payload);
+    if (typeof socketOrUsername === 'string') {
+        emitToUser(socketOrUsername, 'user data', payload);
+    } else {
+        socketOrUsername.emit('user data', payload);
     }
 }
 
@@ -319,7 +323,7 @@ io.on('connection', (socket) => {
                     }
                 });
             }
-            io.emit('user list', Array.from(connectedUsers.keys()));
+            io.emit('user list', getOnlineUsersWithStatus());
         }
     });
 
@@ -505,17 +509,6 @@ io.on('connection', (socket) => {
             try {
                 await db.updateUser(socket.username, { selectedCharacter: charData });
                 console.log(`Saved character for ${socket.username}:`, charData.name);
-            } catch (error) {
-                console.error(`Failed to save character for ${socket.username}:`, error);
-            }
-        }
-    });
-
-    socket.on('character:save', async (charData) => {
-        if (socket.username) {
-            try {
-                await db.updateUser(socket.username, { selectedCharacter: charData });
-                console.log(`Saved character for ${socket.username}:`, charData.name);
                 io.emit('user list', getOnlineUsersWithStatus());
             } catch (error) {
                 console.error(`Failed to save character for ${socket.username}:`, error);
@@ -543,9 +536,7 @@ io.on('connection', (socket) => {
         }
         pendingInvitations.get(inviterUsername).add(inviteeUsername);
 
-        inviteeSockets.forEach(socketId => {
-            io.to(socketId).emit('rpg:receive-invitation', { from: inviterUsername });
-        });
+        emitToUser(inviteeUsername, 'rpg:receive-invitation', { from: inviterUsername });
 
         setTimeout(() => {
             const pending = pendingInvitations.get(inviterUsername);
@@ -572,14 +563,8 @@ io.on('connection', (socket) => {
             pendingInvitations.delete(inviterUsername);
         }
 
-        const inviterSockets = connectedUsers.get(inviterUsername);
-
         if (response === 'declined') {
-            if (inviterSockets) {
-                inviterSockets.forEach(socketId => {
-                    io.to(socketId).emit('rpg:invitation-declined', { from: inviteeUsername });
-                });
-            }
+            emitToUser(inviterUsername, 'rpg:invitation-declined', { from: inviteeUsername });
             return;
         }
 
@@ -592,19 +577,10 @@ io.on('connection', (socket) => {
                 party.add(inviteeUsername);
 
                 party.forEach(memberUsername => {
-                    const memberSockets = connectedUsers.get(memberUsername);
-                    if (memberSockets) {
-                        memberSockets.forEach(socketId => {
-                            io.to(socketId).emit('rpg:party-update', { party: Array.from(party) });
-                        });
-                    }
+                    emitToUser(memberUsername, 'rpg:party-update', { party: Array.from(party) });
                 });
             } else {
-                if (inviterSockets) {
-                    inviterSockets.forEach(socketId => {
-                        io.to(socketId).emit('rpg:invitation-error', { message: 'Party is full.' });
-                    });
-                }
+                emitToUser(inviterUsername, 'rpg:invitation-error', { message: 'Party is full.' });
             }
         }
     });
@@ -625,12 +601,7 @@ io.on('connection', (socket) => {
         });
 
         partyMembers.forEach(memberUsername => {
-            const memberSockets = connectedUsers.get(memberUsername);
-            if (memberSockets) {
-                memberSockets.forEach(socketId => {
-                    io.to(socketId).emit('rpg:launch-game', { party: partyData });
-                });
-            }
+            emitToUser(memberUsername, 'rpg:launch-game', { party: partyData });
         });
     });
 });
