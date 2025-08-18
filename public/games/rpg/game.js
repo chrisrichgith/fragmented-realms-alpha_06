@@ -65,6 +65,12 @@ function init() {
         // Game Screen Elements
         gameCharacterCardContainer: document.getElementById('game-character-card-container'),
         npcSelectionContainer: document.getElementById('npc-selection-container'),
+        locationOverlayContainer: document.getElementById('location-overlay-container'),
+        locationName: document.getElementById('location-name'),
+        locationDetailMap: document.getElementById('location-detail-map'),
+        backToWorldMapBtn: document.getElementById('back-to-world-map-btn'),
+        worldMapLeft: document.getElementById('world-map-left'),
+        worldMapRight: document.getElementById('world-map-right'),
     };
     
     setupEventListeners();
@@ -259,6 +265,7 @@ function startGame(characterData) {
 
     npcParty = [null, null, null]; // Reset party
     displayNpcs();
+    initWorldMap();
 }
 
 function displayNpcs() {
@@ -357,6 +364,58 @@ function updateNpcCard(index) {
 
     const portrait = npcCard.querySelector('img');
     portrait.src = portraitPath;
+}
+
+function initWorldMap() {
+    if (!ui.locationOverlayContainer) return;
+    ui.locationOverlayContainer.innerHTML = '';
+
+    for (const locId in LOCATIONS) {
+        const loc = LOCATIONS[locId];
+        const spot = document.createElement('div');
+        spot.className = 'location-spot';
+        spot.style.top = loc.coords.top;
+        spot.style.left = loc.coords.left;
+        spot.style.width = loc.coords.width;
+        spot.style.height = loc.coords.height;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'location-overlay';
+        spot.appendChild(overlay);
+
+        const label = document.createElement('div');
+        label.className = 'location-name-label';
+        label.textContent = loc.name;
+        spot.appendChild(label);
+
+        overlay.addEventListener('click', () => {
+            currentLocationId = locId;
+            ui.locationName.textContent = loc.name;
+            ui.locationDetailMap.src = loc.detailMap;
+
+            ui.worldMapLeft.classList.add('split');
+            ui.worldMapRight.classList.add('split');
+
+            setTimeout(() => {
+                ui.locationDetailScreen.style.display = 'block';
+            }, 400);
+        });
+
+        ui.locationOverlayContainer.appendChild(spot);
+    }
+
+    ui.backToWorldMapBtn.addEventListener('click', () => {
+        ui.locationDetailScreen.style.display = 'none';
+        ui.worldMapLeft.classList.remove('split');
+        ui.worldMapRight.classList.remove('split');
+    });
+
+    // Show labels after a delay
+    setTimeout(() => {
+        if (ui.locationOverlayContainer) {
+            ui.locationOverlayContainer.classList.add('active');
+        }
+    }, 1000);
 }
 
 window.onload = init;

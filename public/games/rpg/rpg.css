@@ -726,7 +726,7 @@ input[type=range]::-moz-range-thumb {
     padding: 10px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
 }
 
 .npc-card img {
@@ -740,14 +740,14 @@ input[type=range]::-moz-range-thumb {
 .npc-card-details {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     flex-grow: 1; /* Allow it to take available space */
 }
 
 .npc-card .gender-selector {
     justify-content: flex-start; /* Align buttons to the left */
     margin-top: 5px;
-    gap: 10px; /* Add space between buttons */
+    gap: 5px; /* Add space between buttons */
 }
 
 .npc-card .gender-btn {
@@ -768,6 +768,7 @@ input[type=range]::-moz-range-thumb {
     border-radius: 4px;
     padding: 5px;
     font-family: 'Cinzel', serif;
+    width: 100%;
 }
 
 #world-map-container {
