@@ -20,7 +20,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-const connectedUsers = new Map(); // Stores username -> socket.id
+const connectedUsers = new Map(); // Stores username -> Set<socket.id>
 const pendingInvitations = new Map(); // inviter -> Set<invitee>
 const parties = new Map(); // partyId (leader username) -> Set<username>
 
@@ -197,17 +197,12 @@ io.on('connection', (socket) => {
                 }
             }
 
-            if (connectedUsers.has(user.username)) {
-                const oldSocketId = connectedUsers.get(user.username);
-                const oldSocket = io.sockets.sockets.get(oldSocketId);
-                if (oldSocket) {
-                    oldSocket.emit('force logout');
-                    oldSocket.disconnect();
-                }
+            if (!connectedUsers.has(user.username)) {
+                connectedUsers.set(user.username, new Set());
             }
+            connectedUsers.get(user.username).add(socket.id);
 
             socket.username = user.username;
-            connectedUsers.set(user.username, socket.id);
             await db.setUserOnline(user.username, true);
 
             socket.emit('login success', {
@@ -239,12 +234,18 @@ io.on('connection', (socket) => {
 
     // --- Logout & Disconnect ---
     const handleDisconnect = async () => {
-        if (socket.username && connectedUsers.get(socket.username) === socket.id) {
-            console.log(`User ${socket.username} disconnected.`);
-            await db.setUserOnline(socket.username, false);
-            connectedUsers.delete(socket.username);
-            io.emit('user list', Array.from(connectedUsers.keys()));
-            io.emit('chat message', { user: 'System', text: `${socket.username} hat das Spiel verlassen.` });
+        if (socket.username) {
+            const userSockets = connectedUsers.get(socket.username);
+            if (userSockets) {
+                userSockets.delete(socket.id);
+                if (userSockets.size === 0) {
+                    console.log(`User ${socket.username} disconnected.`);
+                    await db.setUserOnline(socket.username, false);
+                    connectedUsers.delete(socket.username);
+                    io.emit('user list', Array.from(connectedUsers.keys()));
+                    io.emit('chat message', { user: 'System', text: `${socket.username} hat das Spiel verlassen.` });
+                }
+            }
         }
     };
 
@@ -297,13 +298,15 @@ io.on('connection', (socket) => {
     socket.on('admin:delete-user', async ({ targetUsername }) => {
         if (isAdmin(socket.username)) {
             await db.deleteUser(targetUsername);
-            const targetSocketId = connectedUsers.get(targetUsername);
-            if (targetSocketId) {
-                const targetSocket = io.sockets.sockets.get(targetSocketId);
-                if (targetSocket) {
-                    targetSocket.emit('force logout');
-                    targetSocket.disconnect();
-                }
+            const targetSockets = connectedUsers.get(targetUsername);
+            if (targetSockets) {
+                targetSockets.forEach(socketId => {
+                    const targetSocket = io.sockets.sockets.get(socketId);
+                    if (targetSocket) {
+                        targetSocket.emit('force logout');
+                        targetSocket.disconnect();
+                    }
+                });
             }
             io.emit('user list', Array.from(connectedUsers.keys()));
         }
@@ -311,13 +314,15 @@ io.on('connection', (socket) => {
 
     socket.on('admin:kick', (targetUsername) => {
         if (isAdmin(socket.username)) {
-            const targetSocketId = connectedUsers.get(targetUsername);
-            if (targetSocketId) {
-                const targetSocket = io.sockets.sockets.get(targetSocketId);
-                if (targetSocket) {
-                    targetSocket.emit('force logout');
-                    targetSocket.disconnect();
-                }
+            const targetSockets = connectedUsers.get(targetUsername);
+            if (targetSockets) {
+                targetSockets.forEach(socketId => {
+                    const targetSocket = io.sockets.sockets.get(socketId);
+                    if (targetSocket) {
+                        targetSocket.emit('force logout');
+                        targetSocket.disconnect();
+                    }
+                });
             }
         }
     });
@@ -325,13 +330,15 @@ io.on('connection', (socket) => {
     socket.on('admin:ban', async (targetUsername) => {
         if (isAdmin(socket.username)) {
             await db.updateUser(targetUsername, { isBanned: true });
-            const targetSocketId = connectedUsers.get(targetUsername);
-            if (targetSocketId) {
-                const targetSocket = io.sockets.sockets.get(targetSocketId);
-                if (targetSocket) {
-                    targetSocket.emit('force logout');
-                    targetSocket.disconnect();
-                }
+            const targetSockets = connectedUsers.get(targetUsername);
+            if (targetSockets) {
+                targetSockets.forEach(socketId => {
+                    const targetSocket = io.sockets.sockets.get(socketId);
+                    if (targetSocket) {
+                        targetSocket.emit('force logout');
+                        targetSocket.disconnect();
+                    }
+                });
             }
         }
     });
@@ -515,6 +522,17 @@ io.on('connection', (socket) => {
         });
 
         socket.emit('rpg:invitable-players-list', invitablePlayers);
+    });
+
+    socket.on('rpg:register-socket', ({ username }) => {
+        if (username && db.findUserByUsername(username)) {
+            socket.username = username;
+            if (!connectedUsers.has(username)) {
+                connectedUsers.set(username, new Set());
+            }
+            connectedUsers.get(username).add(socket.id);
+            console.log(`RPG socket registered for user ${username}`);
+        }
     });
 
     socket.on('rpg:invite-player', (inviteeUsername) => {
