@@ -253,14 +253,19 @@ function startGame(characterData) {
 function updatePartyView() {
     if (!ui.npcSelectionContainer) return;
     ui.npcSelectionContainer.innerHTML = '';
-    const username = localStorage.getItem('username');
-    const otherPlayers = partyData.filter(p => p.username !== username);
 
-    for (let i = 0; i < 3; i++) {
-        const partyMember = otherPlayers[i];
+    // Render all players in the partyData array.
+    partyData.forEach(partyMember => {
         if (partyMember && partyMember.character) {
             const playerCard = document.createElement('div');
             playerCard.className = 'npc-card';
+
+            // Highlight the current player's card in the list
+            const myUsername = localStorage.getItem('username');
+            if (partyMember.username === myUsername) {
+                playerCard.classList.add('current-player');
+            }
+
             playerCard.innerHTML = `
                 <img src="${partyMember.character.image}" alt="${partyMember.username}">
                 <div class="npc-card-details">
@@ -270,6 +275,14 @@ function updatePartyView() {
             `;
             ui.npcSelectionContainer.appendChild(playerCard);
         }
+    });
+
+    // Add empty slots to fill up to 4 total party slots for consistent UI
+    const maxPartySize = 4;
+    for (let i = partyData.length; i < maxPartySize; i++) {
+        const emptySlot = document.createElement('div');
+        emptySlot.className = 'npc-card empty';
+        ui.npcSelectionContainer.appendChild(emptySlot);
     }
 }
 
