@@ -63,6 +63,11 @@
                     </ul>
                     <button id="startRpgBtn" class="char-button">RPG starten</button>
                 </div>
+                <div id="party-container" class="party-container">
+                    <h3>Party</h3>
+                    <ul id="partyList"></ul>
+                    <button id="startPartyRpgBtn" style="display: none;">Start RPG for Party</button>
+                </div>
             </div>
 
             <div class="chat-container">
@@ -157,5 +162,17 @@
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="/js/chat.js"></script>
+
+    <!-- Invitation Modal -->
+    <div id="invitation-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2 id="invitation-title">Einladung</h2>
+            <p id="invitation-text"></p>
+            <div class="modal-buttons">
+                <button id="invitation-accept-btn">Annehmen</button>
+                <button id="invitation-decline-btn">Ablehnen</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

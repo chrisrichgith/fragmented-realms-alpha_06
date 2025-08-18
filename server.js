@@ -132,6 +132,17 @@ app.post('/api/rpg/mapconfig', (req, res) => {
 
 
 // --- Helper to send full user data ---
+function getOnlineUsersWithStatus() {
+    const onlineUsernames = Array.from(connectedUsers.keys());
+    return onlineUsernames.map(username => {
+        const user = db.findUserByUsername(username);
+        return {
+            username: username,
+            hasRpgChar: !!(user && user.selectedCharacter),
+        };
+    });
+}
+
 function emitUserData(socketOrUsername, user) {
     if (!user) return; // Safety check
 
@@ -212,7 +223,7 @@ io.on('connection', (socket) => {
 
             emitUserData(socket, user);
 
-            io.emit('user list', Array.from(connectedUsers.keys()));
+            io.emit('user list', getOnlineUsersWithStatus());
             io.emit('chat message', { user: 'System', text: `${user.username} ist dem Spiel beigetreten.` });
 
         } catch (error) {
@@ -242,7 +253,7 @@ io.on('connection', (socket) => {
                     console.log(`User ${socket.username} disconnected.`);
                     await db.setUserOnline(socket.username, false);
                     connectedUsers.delete(socket.username);
-                    io.emit('user list', Array.from(connectedUsers.keys()));
+                    io.emit('user list', getOnlineUsersWithStatus());
                     io.emit('chat message', { user: 'System', text: `${socket.username} hat das Spiel verlassen.` });
                 }
             }
@@ -505,33 +516,10 @@ io.on('connection', (socket) => {
             try {
                 await db.updateUser(socket.username, { selectedCharacter: charData });
                 console.log(`Saved character for ${socket.username}:`, charData.name);
+                io.emit('user list', getOnlineUsersWithStatus());
             } catch (error) {
                 console.error(`Failed to save character for ${socket.username}:`, error);
             }
-        }
-    });
-
-    socket.on('rpg:get-invitable-players', () => {
-        if (!socket.username) return;
-
-        const onlineUsernames = Array.from(connectedUsers.keys());
-        const invitablePlayers = onlineUsernames.filter(username => {
-            if (username === socket.username) return false;
-            const user = db.findUserByUsername(username);
-            return user && user.selectedCharacter;
-        });
-
-        socket.emit('rpg:invitable-players-list', invitablePlayers);
-    });
-
-    socket.on('rpg:register-socket', ({ username }) => {
-        if (username && db.findUserByUsername(username)) {
-            socket.username = username;
-            if (!connectedUsers.has(username)) {
-                connectedUsers.set(username, new Set());
-            }
-            connectedUsers.get(username).add(socket.id);
-            console.log(`RPG socket registered for user ${username}`);
         }
     });
 
@@ -539,13 +527,12 @@ io.on('connection', (socket) => {
         if (!socket.username || !inviteeUsername || socket.username === inviteeUsername) return;
 
         const inviterUsername = socket.username;
-        const inviteeSocketId = connectedUsers.get(inviteeUsername);
+        const inviteeSockets = connectedUsers.get(inviteeUsername);
 
-        if (!inviteeSocketId) {
+        if (!inviteeSockets || inviteeSockets.size === 0) {
             return socket.emit('rpg:invitation-error', { message: 'Player is not online.' });
         }
 
-        // Check for pending invitations
         const pending = pendingInvitations.get(inviterUsername);
         if (pending && pending.has(inviteeUsername)) {
             return socket.emit('rpg:invitation-error', { message: 'Invitation already sent.' });
@@ -556,9 +543,10 @@ io.on('connection', (socket) => {
         }
         pendingInvitations.get(inviterUsername).add(inviteeUsername);
 
-        io.to(inviteeSocketId).emit('rpg:receive-invitation', { from: inviterUsername });
+        inviteeSockets.forEach(socketId => {
+            io.to(socketId).emit('rpg:receive-invitation', { from: inviterUsername });
+        });
 
-        // Remove pending invitation after 30 seconds
         setTimeout(() => {
             const pending = pendingInvitations.get(inviterUsername);
             if (pending) {
@@ -584,11 +572,13 @@ io.on('connection', (socket) => {
             pendingInvitations.delete(inviterUsername);
         }
 
-        const inviterSocketId = connectedUsers.get(inviterUsername);
+        const inviterSockets = connectedUsers.get(inviterUsername);
 
         if (response === 'declined') {
-            if (inviterSocketId) {
-                io.to(inviterSocketId).emit('rpg:invitation-declined', { from: inviteeUsername });
+            if (inviterSockets) {
+                inviterSockets.forEach(socketId => {
+                    io.to(socketId).emit('rpg:invitation-declined', { from: inviteeUsername });
+                });
             }
             return;
         }
@@ -601,20 +591,47 @@ io.on('connection', (socket) => {
             if (party.size < 4) {
                 party.add(inviteeUsername);
 
-                socket.emit('rpg:join-party-success', { party: Array.from(party) });
-
                 party.forEach(memberUsername => {
-                    const memberSocketId = connectedUsers.get(memberUsername);
-                    if (memberSocketId) {
-                        io.to(memberSocketId).emit('rpg:party-update', { party: Array.from(party) });
+                    const memberSockets = connectedUsers.get(memberUsername);
+                    if (memberSockets) {
+                        memberSockets.forEach(socketId => {
+                            io.to(socketId).emit('rpg:party-update', { party: Array.from(party) });
+                        });
                     }
                 });
             } else {
-                if (inviterSocketId) {
-                    io.to(inviterSocketId).emit('rpg:invitation-error', { message: 'Party is full.' });
+                if (inviterSockets) {
+                    inviterSockets.forEach(socketId => {
+                        io.to(socketId).emit('rpg:invitation-error', { message: 'Party is full.' });
+                    });
                 }
             }
         }
+    });
+
+    socket.on('rpg:start-party-game', () => {
+        if (!socket.username) return;
+
+        const party = parties.get(socket.username);
+        if (!party) return;
+
+        const partyMembers = Array.from(party);
+        const partyData = partyMembers.map(username => {
+            const user = db.findUserByUsername(username);
+            return {
+                username: user.username,
+                character: user.selectedCharacter,
+            };
+        });
+
+        partyMembers.forEach(memberUsername => {
+            const memberSockets = connectedUsers.get(memberUsername);
+            if (memberSockets) {
+                memberSockets.forEach(socketId => {
+                    io.to(socketId).emit('rpg:launch-game', { party: partyData });
+                });
+            }
+        });
     });
 });
 
