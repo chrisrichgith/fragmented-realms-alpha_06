@@ -15,11 +15,6 @@ const LOCATIONS = {
 
 // Game objects
 let keys = {};
-const socket = io();
-const username = localStorage.getItem('username');
-if (username) {
-    socket.emit('rpg:register-socket', { username });
-}
 
 // UI Elements
 let ui = {};
@@ -38,6 +33,12 @@ let creationState = {
 
 // Initialize game
 function init() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('username');
+    if (username) {
+        localStorage.setItem('username', username);
+    }
+
     // Populate UI object
     ui = {
         // Screens
@@ -91,7 +92,6 @@ function init() {
     setupEventListeners();
     initCharacterCreationScreen();
     
-    const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('action') === 'continue') {
         const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
         if (characterData) {
@@ -129,41 +129,44 @@ function setupEventListeners() {
     document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
     ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
 
-    socket.on('rpg:invitable-players-list', (players) => {
-        ui.invitablePlayersList.innerHTML = '';
-        players.forEach(player => {
-            const playerEl = document.createElement('div');
-            playerEl.className = 'invitable-player';
-            playerEl.innerHTML = `
-                <span>${player}</span>
-                <button class="invite-btn" data-username="${player}">Invite</button>
-            `;
-            playerEl.querySelector('.invite-btn').addEventListener('click', (e) => {
-                const username = e.target.dataset.username;
-                socket.emit('rpg:invite-player', username);
-            });
-            ui.invitablePlayersList.appendChild(playerEl);
-        });
-    });
+    window.addEventListener('message', (event) => {
+        if (!event.data || !event.data.type) return;
 
-    socket.on('rpg:receive-invitation', ({ from }) => {
-        currentInvitation = { from };
-        ui.invitationText.textContent = `You have received an invitation from ${from}.`;
-        ui.invitationModal.style.display = 'flex';
-    });
-
-    socket.on('rpg:party-update', ({ party }) => {
-        updatePartyView(party);
-    });
-
-    socket.on('rpg:join-party-success', ({ party }) => {
-        showScreen('game');
-        updatePartyView(party);
+        switch (event.data.type) {
+            case 'rpg:invitable-players-list':
+                ui.invitablePlayersList.innerHTML = '';
+                event.data.payload.forEach(player => {
+                    const playerEl = document.createElement('div');
+                    playerEl.className = 'invitable-player';
+                    playerEl.innerHTML = `
+                        <span>${player}</span>
+                        <button class="invite-btn" data-username="${player}">Invite</button>
+                    `;
+                    playerEl.querySelector('.invite-btn').addEventListener('click', (e) => {
+                        const username = e.target.dataset.username;
+                        window.opener.postMessage({ type: 'rpg:invite-player', payload: username }, '*');
+                    });
+                    ui.invitablePlayersList.appendChild(playerEl);
+                });
+                break;
+            case 'rpg:receive-invitation':
+                currentInvitation = { from: event.data.payload.from };
+                ui.invitationText.textContent = `You have received an invitation from ${event.data.payload.from}.`;
+                ui.invitationModal.style.display = 'flex';
+                break;
+            case 'rpg:party-update':
+                updatePartyView(event.data.payload.party);
+                break;
+            case 'rpg:join-party-success':
+                showScreen('game');
+                updatePartyView(event.data.payload.party);
+                break;
+        }
     });
 
     ui.invitationAcceptBtn.addEventListener('click', () => {
         if (currentInvitation) {
-            socket.emit('rpg:respond-to-invitation', { from: currentInvitation.from, response: 'accepted' });
+            window.opener.postMessage({ type: 'rpg:respond-to-invitation', payload: { from: currentInvitation.from, response: 'accepted' } }, '*');
             ui.invitationModal.style.display = 'none';
             currentInvitation = null;
         }
@@ -171,7 +174,7 @@ function setupEventListeners() {
 
     ui.invitationDeclineBtn.addEventListener('click', () => {
         if (currentInvitation) {
-            socket.emit('rpg:respond-to-invitation', { from: currentInvitation.from, response: 'declined' });
+            window.opener.postMessage({ type: 'rpg:respond-to-invitation', payload: { from: currentInvitation.from, response: 'declined' } }, '*');
             ui.invitationModal.style.display = 'none';
             currentInvitation = null;
         }
@@ -311,7 +314,10 @@ function confirmCharacter() {
     // For now, log to console and save to localStorage
     console.log("Character Confirmed:", finalCharData);
     localStorage.setItem('selectedCharacter', JSON.stringify(finalCharData));
-    socket.emit('character:save', finalCharData);
+
+    if (window.opener) {
+        window.opener.postMessage({ type: 'character-selected', data: finalCharData }, '*');
+    }
 
     startGame(finalCharData);
 }
@@ -338,7 +344,9 @@ function startGame(characterData) {
     updatePartyView([]);
     initWorldMap();
 
-    socket.emit('rpg:get-invitable-players');
+    if (window.opener) {
+        window.opener.postMessage({ type: 'rpg:get-invitable-players' }, '*');
+    }
 }
 
 function updatePartyView(party) {

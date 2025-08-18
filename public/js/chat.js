@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isAdmin = false;
     let sendToTarget = null;
     let characterIsSelected = false;
+    let rpgWindow = null;
 
     // --- Configs ---
     const GAMES_CONFIG = {
@@ -355,8 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     startRpgBtn.addEventListener('click', () => {
-        const url = '/games/rpg/index.html';
-        window.open(url, '_blank');
+        const url = `/games/rpg/index.html?username=${currentUser}`;
+        rpgWindow = window.open(url, '_blank');
     });
 
     if (adminPanelBtn) {
@@ -508,47 +509,74 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(`Level Up fehlgeschlagen: ${data.message}`);
     });
 
+    socket.on('rpg:invitable-players-list', (players) => {
+        if (rpgWindow) {
+            rpgWindow.postMessage({ type: 'rpg:invitable-players-list', payload: players }, '*');
+        }
+    });
+
+    socket.on('rpg:receive-invitation', (data) => {
+        if (rpgWindow) {
+            rpgWindow.postMessage({ type: 'rpg:receive-invitation', payload: data }, '*');
+        }
+    });
+
+    socket.on('rpg:party-update', (data) => {
+        if (rpgWindow) {
+            rpgWindow.postMessage({ type: 'rpg:party-update', payload: data }, '*');
+        }
+    });
+
+    socket.on('rpg:join-party-success', (data) => {
+        if (rpgWindow) {
+            rpgWindow.postMessage({ type: 'rpg:join-party-success', payload: data }, '*');
+        }
+    });
+
     window.addEventListener('message', (event) => {
-        if (!event.data) return;
+        if (!event.data || !event.data.type) return;
 
-        // Handle score submissions from games
-        if (event.data.type === 'game:score') {
-            socket.emit('game:submit-score', event.data.payload);
-        }
+        switch (event.data.type) {
+            case 'game:score':
+                socket.emit('game:submit-score', event.data.payload);
+                break;
+            case 'party:save':
+                socket.emit('party:save', event.data.payload);
+                break;
+            case 'character-selected':
+                const charData = event.data.data;
+                localStorage.setItem('selectedCharacter', JSON.stringify(charData));
+                console.log('Received character data:', charData);
 
-        // Handle party save from RPG
-        if (event.data.type === 'party:save') {
-            socket.emit('party:save', event.data.payload);
-            return; // Done with this event
-        }
+                const portraitEl = document.getElementById('char-portrait');
+                const nameEl = document.getElementById('char-name');
 
-        // Handle character selection from RPG
-        if (event.data.type === 'character-selected') {
-            const charData = event.data.data;
-            localStorage.setItem('selectedCharacter', JSON.stringify(charData));
-            console.log('Received character data:', charData);
+                if (portraitEl) {
+                    portraitEl.src = charData.image;
+                }
+                if (nameEl && charData.name) {
+                    nameEl.textContent = charData.name;
+                }
+                if (charData.stats) {
+                    charStrength.textContent = charData.stats.strength;
+                    charDexterity.textContent = charData.stats.dexterity;
+                    charIntelligence.textContent = charData.stats.intelligence;
+                }
 
-            const portraitEl = document.getElementById('char-portrait');
-            const nameEl = document.getElementById('char-name');
+                characterIsSelected = true;
+                startRpgBtn.textContent = 'Spiel fortsetzen';
 
-            if (portraitEl) {
-                portraitEl.src = charData.image;
-            }
-            if (nameEl && charData.name) {
-                nameEl.textContent = charData.name;
-            }
-            if (charData.stats) {
-                charStrength.textContent = charData.stats.strength;
-                charDexterity.textContent = charData.stats.dexterity;
-                charIntelligence.textContent = charData.stats.intelligence;
-            }
-
-            // Set state for direct game start
-            characterIsSelected = true;
-            startRpgBtn.textContent = 'Spiel fortsetzen';
-
-            // Also save the character data to the server
-            socket.emit('character:save', charData);
+                socket.emit('character:save', charData);
+                break;
+            case 'rpg:get-invitable-players':
+                socket.emit('rpg:get-invitable-players');
+                break;
+            case 'rpg:invite-player':
+                socket.emit('rpg:invite-player', event.data.payload);
+                break;
+            case 'rpg:respond-to-invitation':
+                socket.emit('rpg:respond-to-invitation', event.data.payload);
+                break;
         }
     });
 });
