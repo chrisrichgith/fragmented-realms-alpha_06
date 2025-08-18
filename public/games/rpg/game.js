@@ -71,6 +71,10 @@ function init() {
         backToWorldMapBtn: document.getElementById('back-to-world-map-btn'),
         worldMapLeft: document.getElementById('world-map-left'),
         worldMapRight: document.getElementById('world-map-right'),
+        locationActions: document.getElementById('location-actions'),
+        questScrollModal: document.getElementById('quest-scroll-modal'),
+        questAcceptBtn: document.getElementById('quest-accept-btn'),
+        questDeclineBtn: document.getElementById('quest-decline-btn'),
     };
     
     setupEventListeners();
@@ -116,6 +120,13 @@ function setupEventListeners() {
 
     // New Creation Screen Listeners
     if (ui.creationScreen) {
+        ui.questAcceptBtn.addEventListener('click', () => {
+            ui.questScrollModal.style.display = 'none';
+        });
+        ui.questDeclineBtn.addEventListener('click', () => {
+            ui.questScrollModal.style.display = 'none';
+        });
+
         ui.classSelect.addEventListener('change', updateCreationState);
         ui.genderSelector.addEventListener('click', (e) => {
             const button = e.target.closest('.gender-btn');
@@ -366,6 +377,27 @@ function updateNpcCard(index) {
     portrait.src = portraitPath;
 }
 
+function displayLocationActions(locId) {
+    const location = LOCATIONS[locId];
+    if (!location || !ui.locationActions) return;
+
+    ui.locationActions.innerHTML = ''; // Clear previous actions
+
+    location.actions.forEach(action => {
+        const button = document.createElement('button');
+        button.textContent = action.charAt(0).toUpperCase() + action.slice(1);
+        button.id = `action-${action}-btn`;
+
+        if (action === 'quest') {
+            button.addEventListener('click', () => {
+                ui.questScrollModal.style.display = 'flex';
+            });
+        }
+
+        ui.locationActions.appendChild(button);
+    });
+}
+
 function initWorldMap() {
     if (!ui.locationOverlayContainer) return;
     ui.locationOverlayContainer.innerHTML = '';
@@ -393,8 +425,13 @@ function initWorldMap() {
             ui.locationName.textContent = loc.name;
             ui.locationDetailMap.src = loc.detailMap;
 
+            displayLocationActions(locId);
+
             ui.worldMapLeft.classList.add('split');
             ui.worldMapRight.classList.add('split');
+
+            ui.locationOverlayContainer.style.display = 'none';
+            ui.locationDetailScreen.style.zIndex = 3;
 
             setTimeout(() => {
                 ui.locationDetailScreen.style.display = 'block';
@@ -406,8 +443,10 @@ function initWorldMap() {
 
     ui.backToWorldMapBtn.addEventListener('click', () => {
         ui.locationDetailScreen.style.display = 'none';
+        ui.locationDetailScreen.style.zIndex = 1;
         ui.worldMapLeft.classList.remove('split');
         ui.worldMapRight.classList.remove('split');
+        ui.locationOverlayContainer.style.display = 'block';
     });
 
     // Show labels after a delay
