@@ -12,42 +12,25 @@ const LOCATIONS = {
     'village_9': { name: 'Kragmoor', coords: { top: '26.54%', left: '80.27%', width: '8%', height: '8%' }, detailMap: '/images/RPG/Maps/Villagemap.png', actions: ['quest', 'rest'] }
 };
 
-// UI Elements
 let ui = {};
-
-// Party state
 let partyData = [];
 let currentLocationId = null;
+let creationState = { name: '', class: '', gender: 'male' };
 
-// Character creation state
-let creationState = {
-    name: '',
-    class: '',
-    gender: 'male',
-};
-
-// Initialize game
 function init() {
-    // Populate UI object
     ui = {
-        // Screens
         titleScreen: document.getElementById('title-screen'),
         gameScreen: document.getElementById('game-screen'),
         optionsScreen: document.getElementById('options-screen'),
         characterCreationScreen: document.getElementById('character-creation-screen'),
         locationDetailScreen: document.getElementById('location-detail-screen'),
-
-        // Buttons
         newGameBtn: document.getElementById('new-game-btn'),
+        startGameDirektBtn: document.getElementById('start-game-direkt-btn'),
         optionsBtn: document.getElementById('options-btn'),
         creationBackBtn: document.getElementById('creation-back-btn'),
         confirmCreationBtn: document.getElementById('confirm-creation-btn'),
-
-        // Audio
         bgMusic: document.getElementById('bg-music'),
         sfxClick: document.getElementById('sfx-click'),
-
-        // New Character Creation Elements
         creationScreen: document.getElementById('character-creation-screen'),
         portraitDisplay: document.getElementById('creation-portrait-display'),
         classDisplay: document.getElementById('creation-class-display'),
@@ -56,8 +39,6 @@ function init() {
         classSelect: document.getElementById('creation-class-select'),
         genderSelector: document.getElementById('creation-gender-selector'),
         charNameInput: document.getElementById('creation-char-name'),
-
-        // Game Screen Elements
         gameCharacterCardContainer: document.getElementById('game-character-card-container'),
         npcSelectionContainer: document.getElementById('npc-selection-container'),
         locationOverlayContainer: document.getElementById('location-overlay-container'),
@@ -77,13 +58,18 @@ function init() {
     
     const urlParams = new URLSearchParams(window.location.search);
     const partyParam = urlParams.get('party');
+    const username = urlParams.get('username');
+
+    if (username) {
+        localStorage.setItem('username', username);
+    }
 
     if (partyParam) {
         partyData = JSON.parse(decodeURIComponent(partyParam));
-        const username = localStorage.getItem('username');
-        const myCharacter = partyData.find(p => p.username === username)?.character;
-        if (myCharacter) {
-            startGame(myCharacter);
+        const myUsername = localStorage.getItem('username');
+        const myPartyData = partyData.find(p => p.username === myUsername);
+        if (myPartyData && myPartyData.character) {
+            startGame(myPartyData.character);
         } else {
             showScreen('title');
         }
@@ -105,6 +91,15 @@ function setupEventListeners() {
     });
 
     ui.newGameBtn.addEventListener('click', () => showScreen('character-creation'));
+    ui.startGameDirektBtn.addEventListener('click', () => {
+        const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
+        if (characterData) {
+            partyData = [{ username: localStorage.getItem('username'), character: characterData }];
+            startGame(characterData);
+        } else {
+            alert('Bitte erstelle zuerst einen Charakter im Menü "Charakter erstellen".');
+        }
+    });
     ui.optionsBtn.addEventListener('click', () => showScreen('options'));
     document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
     ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
@@ -120,10 +115,8 @@ function setupEventListeners() {
         ui.classSelect.addEventListener('change', updateCreationState);
         ui.genderSelector.addEventListener('click', (e) => {
             const button = e.target.closest('.gender-btn');
-            if (button) {
-                if (ui.genderSelector.querySelector('.active')) {
-                    ui.genderSelector.querySelector('.active').classList.remove('active');
-                }
+            if (button && !button.classList.contains('active')) {
+                ui.genderSelector.querySelector('.active').classList.remove('active');
                 button.classList.add('active');
                 updateCreationState();
             }
@@ -172,7 +165,6 @@ function initCharacterCreationScreen() {
 function updateCreationState() {
     if (!ui.creationScreen) return;
     const activeGenderBtn = ui.genderSelector.querySelector('.active');
-
     creationState = {
         name: ui.charNameInput.value.trim(),
         class: ui.classSelect.value,
@@ -240,7 +232,18 @@ function confirmCharacter() {
 function startGame(characterData) {
     showScreen('game');
 
-    const card = `<div class="character-card-game">...</div>`; // Simplified
+    const card = `
+        <div class="character-card-game">
+            <img src="${characterData.image}" alt="${characterData.name}">
+            <h3>${characterData.name}</h3>
+            <p>${characterData.class}</p>
+            <div class="card-stats">
+                <span>STÄ: ${characterData.stats.strength}</span>
+                <span>GES: ${characterData.stats.dexterity}</span>
+                <span>INT: ${characterData.stats.intelligence}</span>
+            </div>
+        </div>
+    `;
     ui.gameCharacterCardContainer.innerHTML = card;
 
     updatePartyView();
@@ -250,14 +253,19 @@ function startGame(characterData) {
 function updatePartyView() {
     if (!ui.npcSelectionContainer) return;
     ui.npcSelectionContainer.innerHTML = '';
-    const username = localStorage.getItem('username');
-    const otherPlayers = partyData.filter(p => p.username !== username);
 
-    for (let i = 0; i < 3; i++) {
-        const partyMember = otherPlayers[i];
-        if (partyMember) {
+    // Render all players in the partyData array.
+    partyData.forEach(partyMember => {
+        if (partyMember && partyMember.character) {
             const playerCard = document.createElement('div');
             playerCard.className = 'npc-card';
+
+            // Highlight the current player's card in the list
+            const myUsername = localStorage.getItem('username');
+            if (partyMember.username === myUsername) {
+                playerCard.classList.add('current-player');
+            }
+
             playerCard.innerHTML = `
                 <img src="${partyMember.character.image}" alt="${partyMember.username}">
                 <div class="npc-card-details">
@@ -267,6 +275,14 @@ function updatePartyView() {
             `;
             ui.npcSelectionContainer.appendChild(playerCard);
         }
+    });
+
+    // Add empty slots to fill up to 4 total party slots for consistent UI
+    const maxPartySize = 4;
+    for (let i = partyData.length; i < maxPartySize; i++) {
+        const emptySlot = document.createElement('div');
+        emptySlot.className = 'npc-card empty';
+        ui.npcSelectionContainer.appendChild(emptySlot);
     }
 }
 
