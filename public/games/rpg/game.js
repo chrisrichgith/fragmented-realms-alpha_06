@@ -16,6 +16,10 @@ const LOCATIONS = {
 // Game objects
 let keys = {};
 const socket = io();
+const username = localStorage.getItem('username');
+if (username) {
+    socket.emit('rpg:register-socket', { username });
+}
 
 // UI Elements
 let ui = {};
