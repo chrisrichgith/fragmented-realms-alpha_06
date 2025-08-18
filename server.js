@@ -145,7 +145,6 @@ function getOnlineUsersWithStatus() {
         })
         .filter(user => user !== null);
 
-    console.log('User list with status:', userListWithStatus);
     return userListWithStatus;
 }
 

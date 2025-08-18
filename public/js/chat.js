@@ -286,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('chat message', (message) => { if (message.user !== currentUser) addMessage(message); });
 
     socket.on('user list', (users) => {
-        console.log('Received user list:', users);
         userList.innerHTML = '';
         users.forEach(user => {
             const userElement = document.createElement('li');
@@ -331,15 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = target.dataset.username;
         if (!username) return;
 
-        if (target.classList.contains('kick-btn')) {
-            if (confirm(`Möchtest du ${username} wirklich kicken?`)) {
-                socket.emit('admin:kick', username);
-            }
-        } else if (target.classList.contains('ban-btn')) {
-            if (confirm(`Möchtest du ${username} wirklich permanent bannen?`)) {
-                socket.emit('admin:ban', username);
-            }
-        } else if (target.classList.contains('send-res-btn')) {
+        if (target.classList.contains('send-res-btn')) {
             sendToTarget = username;
             sendToUserSpan.textContent = username;
             sendResourcesModal.style.display = 'flex';
@@ -359,7 +350,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     startRpgBtn.addEventListener('click', () => {
-        const url = '/games/rpg/index.html';
+        if (!currentUser) {
+            alert("Bitte logge dich zuerst ein.");
+            return;
+        }
+        // Always pass the username. The RPG window will handle the rest.
+        const url = `/games/rpg/index.html?username=${encodeURIComponent(currentUser)}`;
         window.open(url, '_blank');
     });
 
@@ -539,8 +535,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('rpg:launch-game', ({ party }) => {
+        if (!currentUser) return; // Safety check
         const partyData = JSON.stringify(party);
-        const url = `/games/rpg/index.html?party=${encodeURIComponent(partyData)}`;
+        const url = `/games/rpg/index.html?username=${encodeURIComponent(currentUser)}&party=${encodeURIComponent(partyData)}`;
         window.open(url, '_blank');
     });
 
@@ -578,7 +575,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.data.type === 'character-selected') {
             const charData = event.data.data;
             localStorage.setItem('selectedCharacter', JSON.stringify(charData));
-            console.log('Received character data:', charData);
 
             const portraitEl = document.getElementById('char-portrait');
             const nameEl = document.getElementById('char-name');
