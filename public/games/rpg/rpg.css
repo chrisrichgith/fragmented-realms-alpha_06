@@ -124,7 +124,7 @@ body, html {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    width: 250px; /* A fixed width for the left panel */
+    width: 280px; /* A fixed width for the left panel */
 }
 
 #game-character-card-container {
@@ -723,18 +723,18 @@ input[type=range]::-moz-range-thumb {
     background: rgba(40, 30, 30, 0.7);
     border: 1px solid #8a6d4f;
     border-radius: 8px;
-    padding: 10px;
+    padding: 5px;
     display: flex;
     align-items: center;
     gap: 5px;
 }
 
 .npc-card img {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     border: 2px solid #4a2c2a;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .npc-card-details {
