@@ -15,6 +15,7 @@ const LOCATIONS = {
 
 // Game objects
 let keys = {};
+const socket = io();
 
 // UI Elements
 let ui = {};
@@ -22,6 +23,7 @@ let ui = {};
 // Party state
 let npcParty = [null, null, null];
 let currentLocationId = null;
+let currentInvitation = null;
 
 // Character creation state
 let creationState = {
@@ -75,6 +77,11 @@ function init() {
         questScrollModal: document.getElementById('quest-scroll-modal'),
         questAcceptBtn: document.getElementById('quest-accept-btn'),
         questDeclineBtn: document.getElementById('quest-decline-btn'),
+        invitablePlayersList: document.getElementById('invitable-players-list'),
+        invitationModal: document.getElementById('invitation-modal'),
+        invitationText: document.getElementById('invitation-text'),
+        invitationAcceptBtn: document.getElementById('invitation-accept-btn'),
+        invitationDeclineBtn: document.getElementById('invitation-decline-btn'),
     };
     
     setupEventListeners();
@@ -118,10 +125,58 @@ function setupEventListeners() {
     document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
     ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
 
+    socket.on('rpg:invitable-players-list', (players) => {
+        ui.invitablePlayersList.innerHTML = '';
+        players.forEach(player => {
+            const playerEl = document.createElement('div');
+            playerEl.className = 'invitable-player';
+            playerEl.innerHTML = `
+                <span>${player}</span>
+                <button class="invite-btn" data-username="${player}">Invite</button>
+            `;
+            playerEl.querySelector('.invite-btn').addEventListener('click', (e) => {
+                const username = e.target.dataset.username;
+                socket.emit('rpg:invite-player', username);
+            });
+            ui.invitablePlayersList.appendChild(playerEl);
+        });
+    });
+
+    socket.on('rpg:receive-invitation', ({ from }) => {
+        currentInvitation = { from };
+        ui.invitationText.textContent = `You have received an invitation from ${from}.`;
+        ui.invitationModal.style.display = 'flex';
+    });
+
+    socket.on('rpg:party-update', ({ party }) => {
+        updatePartyView(party);
+    });
+
+    socket.on('rpg:join-party-success', ({ party }) => {
+        showScreen('game');
+        updatePartyView(party);
+    });
+
+    ui.invitationAcceptBtn.addEventListener('click', () => {
+        if (currentInvitation) {
+            socket.emit('rpg:respond-to-invitation', { from: currentInvitation.from, response: 'accepted' });
+            ui.invitationModal.style.display = 'none';
+            currentInvitation = null;
+        }
+    });
+
+    ui.invitationDeclineBtn.addEventListener('click', () => {
+        if (currentInvitation) {
+            socket.emit('rpg:respond-to-invitation', { from: currentInvitation.from, response: 'declined' });
+            ui.invitationModal.style.display = 'none';
+            currentInvitation = null;
+        }
+    });
+
     // New Creation Screen Listeners
     if (ui.creationScreen) {
         ui.questAcceptBtn.addEventListener('click', () => {
-            ui.questScrollModal.style.display = 'none';
+            window.location.href = 'battle.html';
         });
         ui.questDeclineBtn.addEventListener('click', () => {
             ui.questScrollModal.style.display = 'none';
@@ -275,72 +330,90 @@ function startGame(characterData) {
     ui.gameCharacterCardContainer.innerHTML = card;
 
     npcParty = [null, null, null]; // Reset party
-    displayNpcs();
+    updatePartyView([]);
     initWorldMap();
+
+    socket.emit('rpg:get-invitable-players');
 }
 
-function displayNpcs() {
+function updatePartyView(party) {
     if (!ui.npcSelectionContainer) return;
 
-    ui.npcSelectionContainer.innerHTML = ''; // Clear existing NPCs
+    ui.npcSelectionContainer.innerHTML = '';
+
+    const otherPlayers = party.filter(p => p !== localStorage.getItem('username'));
 
     for (let i = 0; i < 3; i++) {
-        const npcCard = document.createElement('div');
-        npcCard.className = 'npc-card';
-        npcCard.dataset.index = i;
+        if (i < otherPlayers.length) {
+            // Display real player
+            const player = otherPlayers[i];
+            const playerCard = document.createElement('div');
+            playerCard.className = 'npc-card';
+            // TODO: Get player character data to display portrait etc.
+            playerCard.innerHTML = `
+                <img src="/images/RPG/Charakter/male_silhouette.svg" alt="${player}">
+                <div class="npc-card-details">
+                    <h4>${player}</h4>
+                </div>
+            `;
+            ui.npcSelectionContainer.appendChild(playerCard);
+        } else {
+            // Display NPC slot
+            const npcCard = document.createElement('div');
+            npcCard.className = 'npc-card';
+            npcCard.dataset.index = i;
 
-        const portrait = document.createElement('img');
-        portrait.src = '/images/RPG/Charakter/M.png';
-        portrait.alt = `NPC ${i + 1}`;
+            const portrait = document.createElement('img');
+            portrait.src = '/images/RPG/Charakter/M.png';
+            portrait.alt = `NPC ${i + 1}`;
 
-        const details = document.createElement('div');
-        details.className = 'npc-card-details';
+            const details = document.createElement('div');
+            details.className = 'npc-card-details';
 
-        const classSelect = document.createElement('select');
-        classSelect.className = 'npc-class-select';
-        classSelect.innerHTML = '<option value="">- Klasse -</option>';
-        for (const className in RPG_CLASSES) {
-            if (RPG_CLASSES[className].playable === false) continue;
-            classSelect.appendChild(new Option(className, className));
-        }
-
-        const genderSelector = document.createElement('div');
-        genderSelector.className = 'gender-selector';
-
-        const maleButton = document.createElement('button');
-        maleButton.className = 'gender-btn active';
-        maleButton.dataset.gender = 'male';
-        maleButton.innerHTML = '<img src="/images/RPG/Charakter/M.png" alt="Männlich">';
-
-        const femaleButton = document.createElement('button');
-        femaleButton.className = 'gender-btn';
-        femaleButton.dataset.gender = 'female';
-        femaleButton.innerHTML = '<img src="/images/RPG/Charakter/F.png" alt="Weiblich">';
-
-        genderSelector.appendChild(maleButton);
-        genderSelector.appendChild(femaleButton);
-
-        details.appendChild(classSelect);
-        details.appendChild(genderSelector);
-
-        npcCard.appendChild(portrait);
-        npcCard.appendChild(details);
-
-        ui.npcSelectionContainer.appendChild(npcCard);
-
-        // Add event listeners
-        classSelect.addEventListener('change', () => updateNpcCard(i));
-        genderSelector.addEventListener('click', (e) => {
-            const button = e.target.closest('.gender-btn');
-            if (button && !button.classList.contains('active')) {
-                genderSelector.querySelector('.active').classList.remove('active');
-                button.classList.add('active');
-                updateNpcCard(i);
+            const classSelect = document.createElement('select');
+            classSelect.className = 'npc-class-select';
+            classSelect.innerHTML = '<option value="">- Klasse -</option>';
+            for (const className in RPG_CLASSES) {
+                if (RPG_CLASSES[className].playable === false) continue;
+                classSelect.appendChild(new Option(className, className));
             }
-        });
 
-        // Initial update
-        updateNpcCard(i);
+            const genderSelector = document.createElement('div');
+            genderSelector.className = 'gender-selector';
+
+            const maleButton = document.createElement('button');
+            maleButton.className = 'gender-btn active';
+            maleButton.dataset.gender = 'male';
+            maleButton.innerHTML = '<img src="/images/RPG/Charakter/M.png" alt="Männlich">';
+
+            const femaleButton = document.createElement('button');
+            femaleButton.className = 'gender-btn';
+            femaleButton.dataset.gender = 'female';
+            femaleButton.innerHTML = '<img src="/images/RPG/Charakter/F.png" alt="Weiblich">';
+
+            genderSelector.appendChild(maleButton);
+            genderSelector.appendChild(femaleButton);
+
+            details.appendChild(classSelect);
+            details.appendChild(genderSelector);
+
+            npcCard.appendChild(portrait);
+            npcCard.appendChild(details);
+
+            ui.npcSelectionContainer.appendChild(npcCard);
+
+            classSelect.addEventListener('change', () => updateNpcCard(i));
+            genderSelector.addEventListener('click', (e) => {
+                const button = e.target.closest('.gender-btn');
+                if (button && !button.classList.contains('active')) {
+                    genderSelector.querySelector('.active').classList.remove('active');
+                    button.classList.add('active');
+                    updateNpcCard(i);
+                }
+            });
+
+            updateNpcCard(i);
+        }
     }
 }
 

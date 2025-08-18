@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('login success', (data) => {
         currentUser = data.username;
+        localStorage.setItem('username', currentUser);
         isAdmin = data.isAdmin;
         loginOverlay.style.display = 'none';
         userInfo.textContent = `Angemeldet als: ${currentUser}`;

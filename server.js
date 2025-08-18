@@ -21,6 +21,8 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 const connectedUsers = new Map(); // Stores username -> socket.id
+const pendingInvitations = new Map(); // inviter -> Set<invitee>
+const parties = new Map(); // partyId (leader username) -> Set<username>
 
 // Middleware
 app.use(express.json()); // To parse JSON bodies
@@ -498,6 +500,101 @@ io.on('connection', (socket) => {
                 console.log(`Saved character for ${socket.username}:`, charData.name);
             } catch (error) {
                 console.error(`Failed to save character for ${socket.username}:`, error);
+            }
+        }
+    });
+
+    socket.on('rpg:get-invitable-players', () => {
+        if (!socket.username) return;
+
+        const onlineUsernames = Array.from(connectedUsers.keys());
+        const invitablePlayers = onlineUsernames.filter(username => {
+            if (username === socket.username) return false;
+            const user = db.findUserByUsername(username);
+            return user && user.selectedCharacter;
+        });
+
+        socket.emit('rpg:invitable-players-list', invitablePlayers);
+    });
+
+    socket.on('rpg:invite-player', (inviteeUsername) => {
+        if (!socket.username || !inviteeUsername || socket.username === inviteeUsername) return;
+
+        const inviterUsername = socket.username;
+        const inviteeSocketId = connectedUsers.get(inviteeUsername);
+
+        if (!inviteeSocketId) {
+            return socket.emit('rpg:invitation-error', { message: 'Player is not online.' });
+        }
+
+        // Check for pending invitations
+        const pending = pendingInvitations.get(inviterUsername);
+        if (pending && pending.has(inviteeUsername)) {
+            return socket.emit('rpg:invitation-error', { message: 'Invitation already sent.' });
+        }
+
+        if (!pending) {
+            pendingInvitations.set(inviterUsername, new Set());
+        }
+        pendingInvitations.get(inviterUsername).add(inviteeUsername);
+
+        io.to(inviteeSocketId).emit('rpg:receive-invitation', { from: inviterUsername });
+
+        // Remove pending invitation after 30 seconds
+        setTimeout(() => {
+            const pending = pendingInvitations.get(inviterUsername);
+            if (pending) {
+                pending.delete(inviteeUsername);
+                if (pending.size === 0) {
+                    pendingInvitations.delete(inviterUsername);
+                }
+            }
+        }, 30000);
+    });
+
+    socket.on('rpg:respond-to-invitation', ({ from, response }) => {
+        if (!socket.username) return;
+
+        const inviterUsername = from;
+        const inviteeUsername = socket.username;
+
+        const pending = pendingInvitations.get(inviterUsername);
+        if (!pending || !pending.has(inviteeUsername)) return;
+
+        pending.delete(inviteeUsername);
+        if (pending.size === 0) {
+            pendingInvitations.delete(inviterUsername);
+        }
+
+        const inviterSocketId = connectedUsers.get(inviterUsername);
+
+        if (response === 'declined') {
+            if (inviterSocketId) {
+                io.to(inviterSocketId).emit('rpg:invitation-declined', { from: inviteeUsername });
+            }
+            return;
+        }
+
+        if (response === 'accepted') {
+            if (!parties.has(inviterUsername)) {
+                parties.set(inviterUsername, new Set([inviterUsername]));
+            }
+            const party = parties.get(inviterUsername);
+            if (party.size < 4) {
+                party.add(inviteeUsername);
+
+                socket.emit('rpg:join-party-success', { party: Array.from(party) });
+
+                party.forEach(memberUsername => {
+                    const memberSocketId = connectedUsers.get(memberUsername);
+                    if (memberSocketId) {
+                        io.to(memberSocketId).emit('rpg:party-update', { party: Array.from(party) });
+                    }
+                });
+            } else {
+                if (inviterSocketId) {
+                    io.to(inviterSocketId).emit('rpg:invitation-error', { message: 'Party is full.' });
+                }
             }
         }
     });
