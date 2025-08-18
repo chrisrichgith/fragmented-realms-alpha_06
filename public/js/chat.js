@@ -286,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('chat message', (message) => { if (message.user !== currentUser) addMessage(message); });
 
     socket.on('user list', (users) => {
+        console.log('Received user list:', users);
         userList.innerHTML = '';
         users.forEach(user => {
             const userElement = document.createElement('li');
@@ -316,20 +317,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            if (isAdmin && user.username !== currentUser) {
-                const kickBtn = document.createElement('button');
-                kickBtn.textContent = 'Kick';
-                kickBtn.className = 'kick-btn';
-                kickBtn.dataset.username = user.username;
-
-                const banBtn = document.createElement('button');
-                banBtn.textContent = 'Ban';
-                banBtn.className = 'ban-btn';
-                banBtn.dataset.username = user.username;
-
-                controlsDiv.appendChild(kickBtn);
-                controlsDiv.appendChild(banBtn);
-            }
 
             if(controlsDiv.hasChildNodes()) {
                 userElement.appendChild(controlsDiv);

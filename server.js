@@ -134,13 +134,19 @@ app.post('/api/rpg/mapconfig', (req, res) => {
 // --- Helper to send full user data ---
 function getOnlineUsersWithStatus() {
     const onlineUsernames = Array.from(connectedUsers.keys());
-    return onlineUsernames.map(username => {
-        const user = db.findUserByUsername(username);
-        return {
-            username: username,
-            hasRpgChar: !!(user && user.selectedCharacter),
-        };
-    });
+    const userListWithStatus = onlineUsernames
+        .map(username => {
+            const user = db.findUserByUsername(username);
+            if (!user) return null;
+            return {
+                username: username,
+                hasRpgChar: !!(user && user.selectedCharacter),
+            };
+        })
+        .filter(user => user !== null);
+
+    console.log('User list with status:', userListWithStatus);
+    return userListWithStatus;
 }
 
 function emitToUser(username, event, data) {
