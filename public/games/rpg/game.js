@@ -70,6 +70,7 @@ function init() {
     if (partyId) {
         isPartyLeader = true;
         socket = io();
+        socket.emit('rpg:register-game-socket', { username: myUsername });
         setupSocketListeners();
         const myChar = JSON.parse(localStorage.getItem('selectedCharacter'));
         if (myChar) {
