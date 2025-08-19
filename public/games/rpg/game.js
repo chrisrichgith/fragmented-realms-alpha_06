@@ -72,17 +72,15 @@ function init() {
         socket = io();
         socket.emit('rpg:register-game-socket', { username: myUsername });
         setupSocketListeners();
-        const myChar = JSON.parse(localStorage.getItem('selectedCharacter'));
+        const myChar = JSON.parse(localStorage.getItem(`selectedCharacter_${myUsername}`));
         if (myChar) {
             partyData = [{ username: myUsername, character: myChar }];
             startGame(myChar);
         } else {
-            // Leader should have a character, but as a fallback...
             showScreen('title');
         }
     } else {
-        // This is a solo game.
-        const myChar = JSON.parse(localStorage.getItem('selectedCharacter'));
+        const myChar = JSON.parse(localStorage.getItem(`selectedCharacter_${myUsername}`));
         if (myChar) {
             partyData = [{ username: myUsername, character: myChar }];
             startGame(myChar);
@@ -108,7 +106,7 @@ function setupEventListeners() {
     document.querySelectorAll('button').forEach(button => button.addEventListener('click', playClickSound));
     ui.newGameBtn.addEventListener('click', () => showScreen('character-creation'));
     ui.startGameDirektBtn.addEventListener('click', () => {
-        const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
+        const characterData = JSON.parse(localStorage.getItem(`selectedCharacter_${myUsername}`));
         if (characterData) {
             partyData = [{ username: myUsername, character: characterData }];
             startGame(characterData);
@@ -141,9 +139,6 @@ function setupEventListeners() {
 function setupSocketListeners() {
     if(!socket) return;
     socket.on('battle:started', (battleState) => {
-        // The server has confirmed the battle and sent the initial state.
-        // We need to pass the full party data to the battle page.
-        // The server sends the full party member list in the battle state.
         const partyQueryParam = encodeURIComponent(JSON.stringify(battleState.partyMembers.map(p => ({username: p.name, character: p.character}))));
         const usernameQueryParam = encodeURIComponent(myUsername);
         window.location.href = `battle.html?party=${partyQueryParam}&username=${usernameQueryParam}`;
@@ -235,7 +230,7 @@ function confirmCharacter() {
     const classData = RPG_CLASSES[className];
     const finalCharData = { name, class: className, gender, image: ui.portraitDisplay.src, stats: classData.stats, abilities: classData.abilities };
 
-    localStorage.setItem('selectedCharacter', JSON.stringify(finalCharData));
+    localStorage.setItem(`selectedCharacter_${myUsername}`, JSON.stringify(finalCharData));
     if (window.opener) {
         window.opener.postMessage({ type: 'character-selected', data: finalCharData }, '*');
     }
