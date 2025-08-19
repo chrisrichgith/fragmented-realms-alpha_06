@@ -267,6 +267,12 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('admin:set-admin-status', async ({ targetUsername, isAdmin: newIsAdminValue }) => {
+        if (isAdmin(socket.username)) {
+            await db.setUserAdminStatus(targetUsername, newIsAdminValue);
+        }
+    });
+
     socket.on('admin:update-resources', async ({ targetUsername, resources }) => {
         if (isAdmin(socket.username)) {
             const updatedUser = await db.updateUser(targetUsername, { resources });
