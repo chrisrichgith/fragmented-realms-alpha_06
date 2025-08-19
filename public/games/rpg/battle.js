@@ -60,17 +60,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Render party members
-        // This is a simplified render. We'll need to create proper cards.
-        playerPartyContainer.innerHTML = '<h3>Party</h3>';
+        playerPartyContainer.innerHTML = ''; // Clear previous cards
         state.partyMembers.forEach(member => {
-            const memberDiv = document.createElement('div');
-            memberDiv.id = member.id;
-            memberDiv.className = 'char-card';
-            memberDiv.innerHTML = `
-                <h4>${member.name}</h4>
-                <p>HP: ${member.hp} / ${member.maxHp}</p>
+            const card = document.createElement('div');
+            card.id = member.id;
+            card.className = 'char-card';
+
+            const character = member.character; // Shortcut
+
+            card.innerHTML = `
+                <img src="${character.image}" alt="${character.name}" class="char-portrait-battle">
+                <div class="char-info-battle">
+                    <h4>${member.name}</h4>
+                    <p class="char-class-battle">${character.class}</p>
+                    <div class="stat-bar-container">
+                        <div class="stat-bar health-bar" style="width: ${(member.hp / member.maxHp) * 100}%;"></div>
+                        <span class="stat-value">${member.hp} / ${member.maxHp}</span>
+                    </div>
+                    <div class="char-stats-battle">
+                        <span>STÄ: ${character.stats.strength}</span>
+                        <span>GES: ${character.stats.dexterity}</span>
+                        <span>INT: ${character.stats.intelligence}</span>
+                    </div>
+                </div>
             `;
-            playerPartyContainer.appendChild(memberDiv);
+            playerPartyContainer.appendChild(card);
         });
 
         // Render enemies
