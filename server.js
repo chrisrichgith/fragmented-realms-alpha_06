@@ -654,68 +654,22 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('rpg:start-party-game', () => {
-        if (!socket.username) return;
 
-        const partyId = socket.username;
+    socket.on('party:initiate-battle', ({ partyId, locationId }) => {
+        if (!socket.username || socket.username !== partyId) {
+            // Only the leader can initiate a battle
+            return;
+        }
+
         const party = parties.get(partyId);
+        if (!party) return;
 
-        // Only the leader can start the game.
-        if (!party || party.leader !== socket.username) return;
+        const battleState = createBattle(party, locationId);
 
-        const partyMembers = Array.from(party.members);
-        const partyData = partyMembers.map(username => {
-            const user = db.findUserByUsername(username);
-            return {
-                username: user.username,
-                character: user.selectedCharacter,
-            };
+        // Emit to all members of the party to start the battle
+        party.members.forEach(memberUsername => {
+            emitToUser(memberUsername, 'battle:started', battleState);
         });
-
-        partyMembers.forEach(memberUsername => {
-            emitToUser(memberUsername, 'rpg:launch-game', { party: partyData });
-        });
-    });
-
-    socket.on('party:action', (payload) => {
-        if (!socket.username) return;
-
-        let partyInfo = null;
-        for (const [pId, p] of parties.entries()) {
-            if (p.members.has(socket.username)) {
-                partyInfo = { partyId: pId, party: p };
-                break;
-            }
-        }
-
-        if (!partyInfo) return;
-        const { party } = partyInfo;
-
-        if (party.leader !== socket.username) {
-            return; // Only the leader can perform actions
-        }
-
-        const { action, data } = payload;
-
-        switch (action) {
-            case 'select-location':
-                party.state.currentLocation = data.locationId;
-                party.members.forEach(memberUsername => {
-                    emitToUser(memberUsername, 'party:state-updated', { state: party.state });
-                });
-                break;
-            case 'accept-quest':
-                const locationId = party.state.currentLocation;
-                if (!locationId) return; // Cannot start a battle without a location
-
-                const newBattleState = createBattle(party, locationId);
-                party.members.forEach(memberUsername => {
-                    emitToUser(memberUsername, 'battle:started', newBattleState);
-                });
-                break;
-            default:
-                return; // Unknown action
-        }
     });
 
     socket.on('battle:action', (payload) => {

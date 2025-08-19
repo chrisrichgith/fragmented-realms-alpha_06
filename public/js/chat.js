@@ -360,7 +360,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     startPartyRpgBtn.addEventListener('click', () => {
-        socket.emit('rpg:start-party-game');
+        // This button is only visible to the leader.
+        // The server will construct the full party data when the leader initiates the battle.
+        const url = `/games/rpg/index.html?username=${encodeURIComponent(currentUser)}&partyId=${encodeURIComponent(currentUser)}`;
+        window.open(url, '_blank');
     });
 
     if (adminPanelBtn) {
@@ -521,31 +524,53 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('rpg:party-update', ({ party }) => {
         currentParty = party;
         partyList.innerHTML = '';
+        const isLeader = party.length > 0 && party[0] === currentUser;
+
         party.forEach(member => {
             const li = document.createElement('li');
             li.textContent = member;
+            if (member === party[0]) {
+                li.textContent += ' (Leader)';
+            }
             partyList.appendChild(li);
         });
 
-        if (party.length > 1 && party[0] === currentUser) {
+        if (party.length > 1 && isLeader) {
             startPartyRpgBtn.style.display = 'block';
         } else {
             startPartyRpgBtn.style.display = 'none';
         }
+
+        // Add a status message for non-leaders
+        if (party.length > 1 && !isLeader) {
+            const statusLi = document.createElement('li');
+            statusLi.textContent = 'Waiting for leader to start...';
+            statusLi.className = 'party-status';
+            partyList.appendChild(statusLi);
+        }
     });
 
-    socket.on('rpg:launch-game', ({ party }) => {
-        if (!currentUser) return; // Safety check
-        const partyData = JSON.stringify(party);
-        const url = `/games/rpg/index.html?username=${encodeURIComponent(currentUser)}&party=${encodeURIComponent(partyData)}`;
-        window.open(url, '_blank');
-    });
+    // This event is no longer sent from the server in this flow
+    // socket.on('rpg:launch-game', ({ party }) => { ... });
 
     invitationAcceptBtn.addEventListener('click', () => {
         if (currentInvitation) {
             socket.emit('rpg:respond-to-invitation', { from: currentInvitation.from, response: 'accepted' });
             invitationModal.style.display = 'none';
             currentInvitation = null;
+        }
+    });
+
+    socket.on('battle:started', (battleState) => {
+        // Check if this user is part of the battle but not the leader
+        const amIInParty = battleState.partyMembers.some(p => p.name === currentUser);
+        const amILeader = battleState.partyId === currentUser;
+
+        if (amIInParty && !amILeader) {
+            const partyQueryParam = encodeURIComponent(JSON.stringify(battleState.partyMembers.map(p => ({username: p.name, character: p.character}))));
+            const usernameQueryParam = encodeURIComponent(currentUser);
+            const url = `games/rpg/battle.html?party=${partyQueryParam}&username=${usernameQueryParam}`;
+            window.open(url, '_blank');
         }
     });
 
