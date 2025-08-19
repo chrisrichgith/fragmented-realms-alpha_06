@@ -236,9 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCharacterSheet(data); // Pass the whole data object
 
         if (data.selectedCharacter) {
-            localStorage.setItem('selectedCharacter', JSON.stringify(data.selectedCharacter));
+            localStorage.setItem(`selectedCharacter_${currentUser}`, JSON.stringify(data.selectedCharacter));
         } else {
-            localStorage.removeItem('selectedCharacter');
+            localStorage.removeItem(`selectedCharacter_${currentUser}`);
         }
     });
 
@@ -610,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Handle character selection from RPG
         if (event.data.type === 'character-selected') {
             const charData = event.data.data;
-            localStorage.setItem('selectedCharacter', JSON.stringify(charData));
+            localStorage.setItem(`selectedCharacter_${currentUser}`, JSON.stringify(charData));
 
             const portraitEl = document.getElementById('char-portrait');
             const nameEl = document.getElementById('char-name');
