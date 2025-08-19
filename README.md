@@ -10,7 +10,9 @@ Fragmented Realms ist ein browserbasiertes Multiplayer-Rollenspiel, das eine zen
 - **Online-Liste:** Zeigt alle aktuell eingeloggten Spieler an.
 - **Ressourcen-System:** Spieler erhalten automatisch Ressourcen (Gold, Holz, Erz, Kristall), während sie online sind.
 - **Ressourcen-Transfer:** Spieler können Ressourcen an andere Spieler senden.
-- **Admin-Panel:** Ein einfaches Verwaltungs-Panel für Administratoren, um Benutzerdaten, Ressourcen und freigeschaltete Spiele zu verwalten.
+- **Dynamisches Admin-System:**
+    - Der erste Benutzer, der sich auf einem leeren Server registriert, wird automatisch zum Administrator.
+    - Bestehende Admins können im Admin-Panel anderen Benutzern Admin-Rechte gewähren oder entziehen.
 
 ### RPG-System
 - **Charaktererstellung:** Spieler können einen Charakter mit Namen, Geschlecht und Klasse erstellen. Die Klasse bestimmt die Basis-Attribute und das Aussehen.

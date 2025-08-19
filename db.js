@@ -31,20 +31,16 @@ async function saveUsers() {
 // Find user by username
 function findUserByUsername(username) {
     if (users[username]) {
-        // The key 'username' is the source of truth.
-        // Ensure the returned object has it, even if the file is malformed.
-        return { username: username, ...users[username] };
+        return { ...users[username] }; // Return a copy
     }
     return null;
 }
 
 // Find user by email
 function findUserByEmail(email) {
-    // Find the username (the key) that corresponds to the email.
-    const username = Object.keys(users).find(key => users[key].email === email);
-    if (username && users[username]) {
-        // Now that we have the key, we can construct a robust user object.
-        return { username: username, ...users[username] };
+    const user = Object.values(users).find(u => u.email === email);
+    if (user) {
+        return { ...user }; // Return a copy
     }
     return null;
 }
@@ -139,6 +135,15 @@ async function updateUserPassword(username, hashedPassword) {
     return false;
 }
 
+async function setUserAdminStatus(username, isAdmin) {
+    if (users[username]) {
+        users[username].isAdmin = isAdmin;
+        await saveUsers();
+        return true;
+    }
+    return false;
+}
+
 // Initialize the database
 loadUsers().catch(console.error);
 
@@ -151,4 +156,5 @@ module.exports = {
     getAllUsers,
     deleteUser,
     updateUserPassword,
+    setUserAdminStatus,
 };
