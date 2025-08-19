@@ -180,12 +180,11 @@ function emitUserData(socketOrUsername, user) {
     }
 }
 
-function createBattle(party) {
+function createBattle(party, locationId) {
     const partyId = party.leader;
 
     const partyMembers = Array.from(party.members).map((username, index) => {
         const user = db.findUserByUsername(username);
-        // Deep copy character data to avoid modifying the original user object
         const character = JSON.parse(JSON.stringify(user.selectedCharacter));
         return {
             id: `player-${index}`,
@@ -197,10 +196,17 @@ function createBattle(party) {
         };
     });
 
-    const enemies = [
-        { id: 'enemy-0', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp },
-        { id: 'enemy-1', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp }
-    ];
+    // Determine map and enemies based on location
+    let map = 'Wald.png'; // Default map
+    let enemies = [];
+    if (locationId === 'dungeon_8') {
+        map = 'Höhle.png';
+        enemies.push({ id: 'enemy-0', ...ENEMY_TEMPLATES.orc, hp: ENEMY_TEMPLATES.orc.hp });
+    } else {
+        // Default enemies
+        enemies.push({ id: 'enemy-0', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp });
+        enemies.push({ id: 'enemy-1', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp });
+    }
 
     const turnOrder = [...partyMembers, ...enemies]
         .sort((a, b) => b.speed - a.speed)
@@ -208,6 +214,7 @@ function createBattle(party) {
 
     const battleState = {
         partyId,
+        map: map,
         partyMembers,
         enemies,
         turnOrder,
@@ -698,7 +705,10 @@ io.on('connection', (socket) => {
                 });
                 break;
             case 'accept-quest':
-                const newBattleState = createBattle(party);
+                const locationId = party.state.currentLocation;
+                if (!locationId) return; // Cannot start a battle without a location
+
+                const newBattleState = createBattle(party, locationId);
                 party.members.forEach(memberUsername => {
                     emitToUser(memberUsername, 'battle:started', newBattleState);
                 });

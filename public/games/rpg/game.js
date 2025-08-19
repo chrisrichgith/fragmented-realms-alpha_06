@@ -71,18 +71,25 @@ function init() {
     }
 
     if (partyParam) {
-        socket = io(); // Connect only if in a party
         partyData = JSON.parse(decodeURIComponent(partyParam));
-        if (partyData.length > 0 && partyData[0].username === myUsername) {
-            isPartyLeader = true;
-        }
-        const myPartyData = partyData.find(p => p.username === myUsername);
-        if (myPartyData && myPartyData.character) {
+
+        // Check if ALL party members have a character
+        const allPlayersHaveCharacter = partyData.every(p => p.character);
+
+        if (allPlayersHaveCharacter) {
+            socket = io(); // Connect to the server
+            if (partyData.length > 0 && partyData[0].username === myUsername) {
+                isPartyLeader = true;
+            }
+            const myPartyData = partyData.find(p => p.username === myUsername);
+            // We know myPartyData and myPartyData.character exist because of the .every() check
             startGame(myPartyData.character);
         } else {
+            // If someone is missing a character, everyone goes to the title screen.
             showScreen('title');
         }
     } else {
+        // Solo play logic remains the same, start at title screen.
         showScreen('title');
     }
 
