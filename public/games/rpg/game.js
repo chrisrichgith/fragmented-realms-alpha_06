@@ -12,12 +12,18 @@ const LOCATIONS = {
     'village_9': { name: 'Kragmoor', coords: { top: '26.54%', left: '80.27%', width: '8%', height: '8%' }, detailMap: '/images/RPG/Maps/Villagemap.png', actions: ['quest', 'rest'] }
 };
 
+// --- Global State ---
 let ui = {};
 let partyData = [];
 let currentLocationId = null;
 let creationState = { name: '', class: '', gender: 'male' };
+let socket = null;
+let isPartyLeader = false;
+let myUsername = '';
 
+// --- Initialization ---
 function init() {
+    // Cache all UI elements
     ui = {
         titleScreen: document.getElementById('title-screen'),
         gameScreen: document.getElementById('game-screen'),
@@ -53,20 +59,23 @@ function init() {
         questDeclineBtn: document.getElementById('quest-decline-btn'),
     };
     
-    setupEventListeners();
-    initCharacterCreationScreen();
-    
     const urlParams = new URLSearchParams(window.location.search);
     const partyParam = urlParams.get('party');
-    const username = urlParams.get('username');
+    const usernameParam = urlParams.get('username');
 
-    if (username) {
-        localStorage.setItem('username', username);
+    if (usernameParam) {
+        myUsername = usernameParam;
+        localStorage.setItem('username', usernameParam);
+    } else {
+        myUsername = localStorage.getItem('username');
     }
 
     if (partyParam) {
+        socket = io(); // Connect only if in a party
         partyData = JSON.parse(decodeURIComponent(partyParam));
-        const myUsername = localStorage.getItem('username');
+        if (partyData.length > 0 && partyData[0].username === myUsername) {
+            isPartyLeader = true;
+        }
         const myPartyData = partyData.find(p => p.username === myUsername);
         if (myPartyData && myPartyData.character) {
             startGame(myPartyData.character);
@@ -76,8 +85,15 @@ function init() {
     } else {
         showScreen('title');
     }
+
+    setupEventListeners();
+    initCharacterCreationScreen();
+    if (socket) {
+        setupSocketListeners();
+    }
 }
 
+// --- Sound ---
 function playClickSound() {
     if (ui.sfxClick) {
         ui.sfxClick.currentTime = 0;
@@ -85,16 +101,14 @@ function playClickSound() {
     }
 }
 
+// --- Event Listeners Setup ---
 function setupEventListeners() {
-    document.querySelectorAll('button').forEach(button => {
-        button.addEventListener('click', playClickSound);
-    });
-
+    document.querySelectorAll('button').forEach(button => button.addEventListener('click', playClickSound));
     ui.newGameBtn.addEventListener('click', () => showScreen('character-creation'));
     ui.startGameDirektBtn.addEventListener('click', () => {
         const characterData = JSON.parse(localStorage.getItem('selectedCharacter'));
         if (characterData) {
-            partyData = [{ username: localStorage.getItem('username'), character: characterData }];
+            partyData = [{ username: myUsername, character: characterData }];
             startGame(characterData);
         } else {
             alert('Bitte erstelle zuerst einen Charakter im Menü "Charakter erstellen".');
@@ -103,15 +117,11 @@ function setupEventListeners() {
     ui.optionsBtn.addEventListener('click', () => showScreen('options'));
     document.getElementById('options-back-btn').addEventListener('click', () => showScreen('title'));
     ui.creationBackBtn.addEventListener('click', () => showScreen('title'));
+    ui.questAcceptBtn.addEventListener('click', handleQuestAccept);
+    ui.questDeclineBtn.addEventListener('click', () => ui.questScrollModal.style.display = 'none');
+    ui.backToWorldMapBtn.addEventListener('click', handleBackToWorldMap);
 
     if (ui.creationScreen) {
-        ui.questAcceptBtn.addEventListener('click', () => {
-            window.location.href = 'battle.html';
-        });
-        ui.questDeclineBtn.addEventListener('click', () => {
-            ui.questScrollModal.style.display = 'none';
-        });
-
         ui.classSelect.addEventListener('change', updateCreationState);
         ui.genderSelector.addEventListener('click', (e) => {
             const button = e.target.closest('.gender-btn');
@@ -126,11 +136,28 @@ function setupEventListeners() {
     }
 }
 
+function setupSocketListeners() {
+    socket.on('party:state-updated', ({ state }) => {
+        // A new state has been received from the server. Update the UI accordingly.
+        if (state.currentLocation && state.currentLocation !== currentLocationId) {
+            showLocationDetail(state.currentLocation);
+        }
+
+        if (state.inBattle) {
+            const partyQueryParam = encodeURIComponent(JSON.stringify(partyData));
+            const usernameQueryParam = encodeURIComponent(myUsername);
+            window.location.href = `battle.html?party=${partyQueryParam}&username=${usernameQueryParam}`;
+        }
+    });
+}
+
+// --- Screen Management ---
 function showScreen(screenId) {
-    if (ui.titleScreen) ui.titleScreen.style.display = 'none';
-    if (ui.gameScreen) ui.gameScreen.style.display = 'none';
-    if (ui.optionsScreen) ui.optionsScreen.style.display = 'none';
-    if (ui.characterCreationScreen) ui.characterCreationScreen.style.display = 'none';
+    Object.values(ui).forEach(el => {
+        if (el && el.id && el.id.endsWith('-screen')) {
+            el.style.display = 'none';
+        }
+    });
 
     switch(screenId) {
         case 'title':
@@ -152,6 +179,7 @@ function showScreen(screenId) {
     }
 }
 
+// --- Character Creation ---
 function initCharacterCreationScreen() {
     if (!ui.creationScreen) return;
     ui.classSelect.innerHTML = '<option value="">- Klasse wählen -</option>';
@@ -195,12 +223,7 @@ function updateCreationScreen() {
         portraitPath = `/images/RPG/Charakter/${portraitFileName}`;
     }
     ui.portraitDisplay.src = portraitPath;
-
-    if (name && name.length >= 3 && className) {
-        ui.confirmCreationBtn.disabled = false;
-    } else {
-        ui.confirmCreationBtn.disabled = true;
-    }
+    ui.confirmCreationBtn.disabled = !(name && name.length >= 3 && className);
 }
 
 function confirmCharacter() {
@@ -211,24 +234,16 @@ function confirmCharacter() {
     }
 
     const classData = RPG_CLASSES[className];
-    const finalCharData = {
-        name,
-        class: className,
-        gender,
-        image: ui.portraitDisplay.src,
-        stats: classData.stats,
-        abilities: classData.abilities
-    };
+    const finalCharData = { name, class: className, gender, image: ui.portraitDisplay.src, stats: classData.stats, abilities: classData.abilities };
 
     localStorage.setItem('selectedCharacter', JSON.stringify(finalCharData));
-
     if (window.opener) {
         window.opener.postMessage({ type: 'character-selected', data: finalCharData }, '*');
     }
-
     window.close();
 }
 
+// --- Game Logic ---
 function startGame(characterData) {
     showScreen('game');
 
@@ -254,18 +269,13 @@ function updatePartyView() {
     if (!ui.npcSelectionContainer) return;
     ui.npcSelectionContainer.innerHTML = '';
 
-    // Render all players in the partyData array.
     partyData.forEach(partyMember => {
         if (partyMember && partyMember.character) {
             const playerCard = document.createElement('div');
             playerCard.className = 'npc-card';
-
-            // Highlight the current player's card in the list
-            const myUsername = localStorage.getItem('username');
             if (partyMember.username === myUsername) {
                 playerCard.classList.add('current-player');
             }
-
             playerCard.innerHTML = `
                 <img src="${partyMember.character.image}" alt="${partyMember.username}">
                 <div class="npc-card-details">
@@ -277,34 +287,12 @@ function updatePartyView() {
         }
     });
 
-    // Add empty slots to fill up to 4 total party slots for consistent UI
     const maxPartySize = 4;
     for (let i = partyData.length; i < maxPartySize; i++) {
         const emptySlot = document.createElement('div');
         emptySlot.className = 'npc-card empty';
         ui.npcSelectionContainer.appendChild(emptySlot);
     }
-}
-
-function displayLocationActions(locId) {
-    const location = LOCATIONS[locId];
-    if (!location || !ui.locationActions) return;
-
-    ui.locationActions.innerHTML = '';
-
-    location.actions.forEach(action => {
-        const button = document.createElement('button');
-        button.textContent = action.charAt(0).toUpperCase() + action.slice(1);
-        button.id = `action-${action}-btn`;
-
-        if (action === 'quest') {
-            button.addEventListener('click', () => {
-                ui.questScrollModal.style.display = 'flex';
-            });
-        }
-
-        ui.locationActions.appendChild(button);
-    });
 }
 
 function initWorldMap() {
@@ -329,34 +317,9 @@ function initWorldMap() {
         label.textContent = loc.name;
         spot.appendChild(label);
 
-        overlay.addEventListener('click', () => {
-            currentLocationId = locId;
-            ui.locationName.textContent = loc.name;
-            ui.locationDetailMap.src = loc.detailMap;
-
-            displayLocationActions(locId);
-
-            ui.worldMapLeft.classList.add('split');
-            ui.worldMapRight.classList.add('split');
-
-            ui.locationOverlayContainer.style.display = 'none';
-            ui.locationDetailScreen.style.zIndex = 3;
-
-            setTimeout(() => {
-                ui.locationDetailScreen.style.display = 'block';
-            }, 400);
-        });
-
+        overlay.addEventListener('click', () => handleLocationClick(locId));
         ui.locationOverlayContainer.appendChild(spot);
     }
-
-    ui.backToWorldMapBtn.addEventListener('click', () => {
-        ui.locationDetailScreen.style.display = 'none';
-        ui.locationDetailScreen.style.zIndex = 1;
-        ui.worldMapLeft.classList.remove('split');
-        ui.worldMapRight.classList.remove('split');
-        ui.locationOverlayContainer.style.display = 'block';
-    });
 
     setTimeout(() => {
         if (ui.locationOverlayContainer) {
@@ -365,4 +328,71 @@ function initWorldMap() {
     }, 1000);
 }
 
+// --- Action Handlers ---
+function handleLocationClick(locId) {
+    if (socket) { // Party mode
+        if (isPartyLeader) {
+            socket.emit('party:action', { action: 'select-location', data: { locationId: locId } });
+        }
+    } else { // Solo mode
+        showLocationDetail(locId);
+    }
+}
+
+function showLocationDetail(locId) {
+    currentLocationId = locId;
+    const loc = LOCATIONS[locId];
+    if (!loc) return;
+
+    ui.locationName.textContent = loc.name;
+    ui.locationDetailMap.src = loc.detailMap;
+    displayLocationActions(locId);
+
+    ui.worldMapLeft.classList.add('split');
+    ui.worldMapRight.classList.add('split');
+    ui.locationOverlayContainer.style.display = 'none';
+    ui.locationDetailScreen.style.zIndex = 3;
+    setTimeout(() => {
+        ui.locationDetailScreen.style.display = 'block';
+    }, 400);
+}
+
+function displayLocationActions(locId) {
+    const location = LOCATIONS[locId];
+    if (!location || !ui.locationActions) return;
+    ui.locationActions.innerHTML = '';
+
+    location.actions.forEach(action => {
+        const button = document.createElement('button');
+        button.textContent = action.charAt(0).toUpperCase() + action.slice(1);
+        button.id = `action-${action}-btn`;
+        if (action === 'quest') {
+            button.addEventListener('click', () => {
+                ui.questScrollModal.style.display = 'flex';
+            });
+        }
+        ui.locationActions.appendChild(button);
+    });
+}
+
+function handleQuestAccept() {
+    ui.questScrollModal.style.display = 'none';
+    if (socket) { // Party mode
+        if (isPartyLeader) {
+            socket.emit('party:action', { action: 'accept-quest' });
+        }
+    } else { // Solo mode
+        window.location.href = 'battle.html';
+    }
+}
+
+function handleBackToWorldMap() {
+    ui.locationDetailScreen.style.display = 'none';
+    ui.locationDetailScreen.style.zIndex = 1;
+    ui.worldMapLeft.classList.remove('split');
+    ui.worldMapRight.classList.remove('split');
+    ui.locationOverlayContainer.style.display = 'block';
+}
+
+// --- Global Entry Point ---
 window.onload = init;

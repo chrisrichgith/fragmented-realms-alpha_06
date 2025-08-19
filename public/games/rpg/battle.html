@@ -8,34 +8,29 @@
 </head>
 <body>
     <div id="battle-container">
-        <div id="left-panel" class="battle-panel">
-            <div id="player-character-card">
-                <!-- Player character card will be injected here -->
-            </div>
-            <div id="npc-character-cards">
-                <!-- NPC character cards will be injected here -->
-            </div>
-        <div id="tactic-items-container">
-            <h2>Taktik</h2>
-            <div id="tactic-items">
-                <!-- Tactic items will be injected here -->
+        <div id="party-panel" class="battle-column">
+            <h3>Your Party</h3>
+            <div id="player-party-container">
+                <!-- Player cards will be dynamically inserted here -->
             </div>
         </div>
+        <div id="center-panel" class="battle-column">
+            <h3>Battle Log</h3>
+            <div id="battle-log">
+                <!-- Battle messages will appear here -->
+            </div>
+            <div id="actions-container">
+                <!-- Action buttons will be inserted here -->
+            </div>
         </div>
-        <div id="center-panel">
-            <img id="battle-map" src="" alt="Battle Map">
-        </div>
-        <div id="right-panel" class="battle-panel">
-        <!-- This panel can be used for other info or removed if not needed -->
-        <h2>Gegner</h2>
-        <div id="enemy-info">
-             <!-- Future content can go here -->
+        <div id="enemy-panel" class="battle-column">
+            <h3>Enemies</h3>
+            <div id="enemy-container">
+                <!-- Enemy cards will be dynamically inserted here -->
             </div>
         </div>
     </div>
-    <script src="class_data.js"></script>
-    <script src="item_data.js"></script>
-    <script src="map_config.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="battle.js"></script>
 </body>
 </html>
