@@ -606,6 +606,14 @@ io.on('connection', (socket) => {
         }, 30000);
     });
 
+    socket.on('rpg:register-game-socket', ({ username }) => {
+        if (username && connectedUsers.has(username)) {
+            socket.username = username;
+            connectedUsers.get(username).add(socket.id);
+            console.log(`Registered new game socket ${socket.id} for user ${username}`);
+        }
+    });
+
     socket.on('rpg:respond-to-invitation', ({ from, response }) => {
         if (!socket.username) return;
 
