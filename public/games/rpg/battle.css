@@ -64,6 +64,69 @@ body, html {
     margin-bottom: 10px;
     border-radius: 5px;
     transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #333;
+}
+
+.char-portrait-battle {
+    width: 60px;
+    height: 60px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.char-info-battle {
+    flex-grow: 1;
+}
+
+.char-info-battle h4 {
+    margin: 0 0 5px 0;
+    color: #fff;
+}
+
+.char-class-battle {
+    font-size: 0.8em;
+    color: #aaa;
+    margin: 0 0 5px 0;
+}
+
+.stat-bar-container {
+    width: 100%;
+    background-color: #555;
+    border-radius: 4px;
+    height: 18px;
+    position: relative;
+    margin-bottom: 5px;
+}
+
+.stat-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease-in-out;
+}
+
+.health-bar {
+    background-color: #d9534f; /* Red */
+}
+
+.stat-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: #fff;
+    text-shadow: 1px 1px 1px #000;
+}
+
+.char-stats-battle {
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.8em;
+    color: #ccc;
 }
 
 .active-turn {
