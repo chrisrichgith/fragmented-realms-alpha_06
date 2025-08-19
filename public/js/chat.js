@@ -419,6 +419,9 @@ document.addEventListener('DOMContentLoaded', () => {
     userSelect.addEventListener('change', () => {
         const selectedUser = userSelect.value;
         adminGames.innerHTML = '';
+        const adminIsAdminCheckbox = document.getElementById('adminIsAdminCheckbox');
+        adminIsAdminCheckbox.checked = false; // Reset on change
+
         if (selectedUser) {
             socket.emit('admin:get-user-data', selectedUser, (user) => {
                 if (user && !user.error) {
@@ -426,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     adminHolz.value = user.resources.holz || 0;
                     adminErz.value = user.resources.erz || 0;
                     adminKristall.value = user.resources.kristall || 0;
+                    adminIsAdminCheckbox.checked = user.isAdmin || false;
 
                     Object.keys(GAMES_CONFIG).forEach(gameId => {
                         const game = GAMES_CONFIG[gameId];
@@ -451,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetUsername = userSelect.value;
         if (!targetUsername) return alert('Please select a user.');
 
+        // Update Resources
         const resources = {
             gold: parseInt(adminGold.value, 10) || 0,
             holz: parseInt(adminHolz.value, 10) || 0,
@@ -459,8 +464,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         socket.emit('admin:update-resources', { targetUsername, resources });
 
+        // Update Games
         const unlockedGames = Array.from(adminGames.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.name);
         socket.emit('admin:update-games', { targetUsername, unlockedGames });
+
+        // Update Admin Status
+        const adminIsAdminCheckbox = document.getElementById('adminIsAdminCheckbox');
+        const newIsAdminValue = adminIsAdminCheckbox.checked;
+        socket.emit('admin:set-admin-status', { targetUsername, isAdmin: newIsAdminValue });
 
         alert('User data update request sent.');
     });

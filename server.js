@@ -20,14 +20,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-const connectedUsers = new Map(); // Stores username -> Set<socket.id>
-const pendingInvitations = new Map(); // inviter -> Set<invitee>
-const parties = new Map(); // partyId (leader username) -> { leader: string, members: Set<string>, state: object }
-const activeBattles = new Map(); // partyId -> battleState
-const ENEMY_TEMPLATES = {
-    'goblin': { name: 'Goblin', hp: 50, maxHp: 50, attack: 10, speed: 5 },
-    'orc': { name: 'Orc', hp: 100, maxHp: 100, attack: 15, speed: 3 }
-};
+const connectedUsers = new Map(); // Stores username -> socket.id
 
 // Middleware
 app.use(express.json()); // To parse JSON bodies
@@ -136,32 +129,7 @@ app.post('/api/rpg/mapconfig', (req, res) => {
 });
 
 
-// --- Helper Functions ---
-function getOnlineUsersWithStatus() {
-    const onlineUsernames = Array.from(connectedUsers.keys());
-    const userListWithStatus = onlineUsernames
-        .map(username => {
-            const user = db.findUserByUsername(username);
-            if (!user) return null;
-            return {
-                username: username,
-                hasRpgChar: !!(user && user.selectedCharacter),
-            };
-        })
-        .filter(user => user !== null);
-
-    return userListWithStatus;
-}
-
-function emitToUser(username, event, data) {
-    const userSockets = connectedUsers.get(username);
-    if (userSockets) {
-        userSockets.forEach(socketId => {
-            io.to(socketId).emit(event, data);
-        });
-    }
-}
-
+// --- Helper to send full user data ---
 function emitUserData(socketOrUsername, user) {
     if (!user) return; // Safety check
 
@@ -172,58 +140,16 @@ function emitUserData(socketOrUsername, user) {
         selectedCharacter: user.selectedCharacter
     };
 
-    if (typeof socketOrUsername === 'string') {
-        emitToUser(socketOrUsername, 'user data', payload);
-    } else {
-        // This is a socket object
-        socketOrUsername.emit('user data', payload);
+    const targetSocketId = typeof socketOrUsername === 'string'
+        ? connectedUsers.get(socketOrUsername)
+        // Note: The socket parameter is only available inside the 'connection' event.
+        // This function will throw an error if called with a socket object outside of that scope.
+        // However, the call from setInterval uses a username, so it's safe.
+        : socketOrUsername.id;
+
+    if (targetSocketId) {
+        io.to(targetSocketId).emit('user data', payload);
     }
-}
-
-function createBattle(party, locationId) {
-    const partyId = party.leader;
-
-    const partyMembers = Array.from(party.members).map((username, index) => {
-        const user = db.findUserByUsername(username);
-        const character = JSON.parse(JSON.stringify(user.selectedCharacter));
-        return {
-            id: `player-${index}`,
-            name: user.username,
-            character: character,
-            hp: character.stats.strength * 10,
-            maxHp: character.stats.strength * 10,
-            speed: character.stats.dexterity
-        };
-    });
-
-    // Determine map and enemies based on location
-    let map = 'Wald.png'; // Default map
-    let enemies = [];
-    if (locationId === 'dungeon_8') {
-        map = 'Höhle.png';
-        enemies.push({ id: 'enemy-0', ...ENEMY_TEMPLATES.orc, hp: ENEMY_TEMPLATES.orc.hp });
-    } else {
-        // Default enemies
-        enemies.push({ id: 'enemy-0', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp });
-        enemies.push({ id: 'enemy-1', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp });
-    }
-
-    const turnOrder = [...partyMembers, ...enemies]
-        .sort((a, b) => b.speed - a.speed)
-        .map(unit => unit.id);
-
-    const battleState = {
-        partyId,
-        map: map,
-        partyMembers,
-        enemies,
-        turnOrder,
-        currentTurnIndex: 0,
-        log: ['A battle has begun!']
-    };
-
-    activeBattles.set(partyId, battleState);
-    return battleState;
 }
 
 io.on('connection', (socket) => {
@@ -269,12 +195,17 @@ io.on('connection', (socket) => {
                 }
             }
 
-            if (!connectedUsers.has(user.username)) {
-                connectedUsers.set(user.username, new Set());
+            if (connectedUsers.has(user.username)) {
+                const oldSocketId = connectedUsers.get(user.username);
+                const oldSocket = io.sockets.sockets.get(oldSocketId);
+                if (oldSocket) {
+                    oldSocket.emit('force logout');
+                    oldSocket.disconnect();
+                }
             }
-            connectedUsers.get(user.username).add(socket.id);
 
             socket.username = user.username;
+            connectedUsers.set(user.username, socket.id);
             await db.setUserOnline(user.username, true);
 
             socket.emit('login success', {
@@ -284,7 +215,7 @@ io.on('connection', (socket) => {
 
             emitUserData(socket, user);
 
-            io.emit('user list', getOnlineUsersWithStatus());
+            io.emit('user list', Array.from(connectedUsers.keys()));
             io.emit('chat message', { user: 'System', text: `${user.username} ist dem Spiel beigetreten.` });
 
         } catch (error) {
@@ -306,18 +237,12 @@ io.on('connection', (socket) => {
 
     // --- Logout & Disconnect ---
     const handleDisconnect = async () => {
-        if (socket.username) {
-            const userSockets = connectedUsers.get(socket.username);
-            if (userSockets) {
-                userSockets.delete(socket.id);
-                if (userSockets.size === 0) {
-                    console.log(`User ${socket.username} disconnected.`);
-                    await db.setUserOnline(socket.username, false);
-                    connectedUsers.delete(socket.username);
-                    io.emit('user list', getOnlineUsersWithStatus());
-                    io.emit('chat message', { user: 'System', text: `${socket.username} hat das Spiel verlassen.` });
-                }
-            }
+        if (socket.username && connectedUsers.get(socket.username) === socket.id) {
+            console.log(`User ${socket.username} disconnected.`);
+            await db.setUserOnline(socket.username, false);
+            connectedUsers.delete(socket.username);
+            io.emit('user list', Array.from(connectedUsers.keys()));
+            io.emit('chat message', { user: 'System', text: `${socket.username} hat das Spiel verlassen.` });
         }
     };
 
@@ -370,31 +295,27 @@ io.on('connection', (socket) => {
     socket.on('admin:delete-user', async ({ targetUsername }) => {
         if (isAdmin(socket.username)) {
             await db.deleteUser(targetUsername);
-            const targetSockets = connectedUsers.get(targetUsername);
-            if (targetSockets) {
-                targetSockets.forEach(socketId => {
-                    const targetSocket = io.sockets.sockets.get(socketId);
-                    if (targetSocket) {
-                        targetSocket.emit('force logout');
-                        targetSocket.disconnect();
-                    }
-                });
+            const targetSocketId = connectedUsers.get(targetUsername);
+            if (targetSocketId) {
+                const targetSocket = io.sockets.sockets.get(targetSocketId);
+                if (targetSocket) {
+                    targetSocket.emit('force logout');
+                    targetSocket.disconnect();
+                }
             }
-            io.emit('user list', getOnlineUsersWithStatus());
+            io.emit('user list', Array.from(connectedUsers.keys()));
         }
     });
 
     socket.on('admin:kick', (targetUsername) => {
         if (isAdmin(socket.username)) {
-            const targetSockets = connectedUsers.get(targetUsername);
-            if (targetSockets) {
-                targetSockets.forEach(socketId => {
-                    const targetSocket = io.sockets.sockets.get(socketId);
-                    if (targetSocket) {
-                        targetSocket.emit('force logout');
-                        targetSocket.disconnect();
-                    }
-                });
+            const targetSocketId = connectedUsers.get(targetUsername);
+            if (targetSocketId) {
+                const targetSocket = io.sockets.sockets.get(targetSocketId);
+                if (targetSocket) {
+                    targetSocket.emit('force logout');
+                    targetSocket.disconnect();
+                }
             }
         }
     });
@@ -402,16 +323,20 @@ io.on('connection', (socket) => {
     socket.on('admin:ban', async (targetUsername) => {
         if (isAdmin(socket.username)) {
             await db.updateUser(targetUsername, { isBanned: true });
-            const targetSockets = connectedUsers.get(targetUsername);
-            if (targetSockets) {
-                targetSockets.forEach(socketId => {
-                    const targetSocket = io.sockets.sockets.get(socketId);
-                    if (targetSocket) {
-                        targetSocket.emit('force logout');
-                        targetSocket.disconnect();
-                    }
-                });
+            const targetSocketId = connectedUsers.get(targetUsername);
+            if (targetSocketId) {
+                const targetSocket = io.sockets.sockets.get(targetSocketId);
+                if (targetSocket) {
+                    targetSocket.emit('force logout');
+                    targetSocket.disconnect();
+                }
             }
+        }
+    });
+
+    socket.on('admin:set-admin-status', async ({ targetUsername, isAdmin: newIsAdminValue }) => {
+        if (isAdmin(socket.username)) {
+            await db.setUserAdminStatus(targetUsername, newIsAdminValue);
         }
     });
 
@@ -566,173 +491,20 @@ io.on('connection', (socket) => {
             try {
                 await db.updateUser(socket.username, { selectedCharacter: charData });
                 console.log(`Saved character for ${socket.username}:`, charData.name);
-                io.emit('user list', getOnlineUsersWithStatus());
             } catch (error) {
                 console.error(`Failed to save character for ${socket.username}:`, error);
             }
         }
     });
 
-    socket.on('rpg:invite-player', (inviteeUsername) => {
-        if (!socket.username || !inviteeUsername || socket.username === inviteeUsername) return;
-
-        const inviterUsername = socket.username;
-        const inviteeSockets = connectedUsers.get(inviteeUsername);
-
-        if (!inviteeSockets || inviteeSockets.size === 0) {
-            return socket.emit('rpg:invitation-error', { message: 'Player is not online.' });
-        }
-
-        const pending = pendingInvitations.get(inviterUsername);
-        if (pending && pending.has(inviteeUsername)) {
-            return socket.emit('rpg:invitation-error', { message: 'Invitation already sent.' });
-        }
-
-        if (!pending) {
-            pendingInvitations.set(inviterUsername, new Set());
-        }
-        pendingInvitations.get(inviterUsername).add(inviteeUsername);
-
-        emitToUser(inviteeUsername, 'rpg:receive-invitation', { from: inviterUsername });
-
-        setTimeout(() => {
-            const pending = pendingInvitations.get(inviterUsername);
-            if (pending) {
-                pending.delete(inviteeUsername);
-                if (pending.size === 0) {
-                    pendingInvitations.delete(inviterUsername);
-                }
+    socket.on('character:save', async (charData) => {
+        if (socket.username) {
+            try {
+                await db.updateUser(socket.username, { selectedCharacter: charData });
+                console.log(`Saved character for ${socket.username}:`, charData.name);
+            } catch (error) {
+                console.error(`Failed to save character for ${socket.username}:`, error);
             }
-        }, 30000);
-    });
-
-    socket.on('rpg:register-game-socket', ({ username }) => {
-        if (username && connectedUsers.has(username)) {
-            socket.username = username;
-            connectedUsers.get(username).add(socket.id);
-            console.log(`Registered new game socket ${socket.id} for user ${username}`);
-        }
-    });
-
-    socket.on('rpg:respond-to-invitation', ({ from, response }) => {
-        if (!socket.username) return;
-
-        const inviterUsername = from;
-        const inviteeUsername = socket.username;
-
-        const pending = pendingInvitations.get(inviterUsername);
-        if (!pending || !pending.has(inviteeUsername)) return;
-
-        pending.delete(inviteeUsername);
-        if (pending.size === 0) {
-            pendingInvitations.delete(inviterUsername);
-        }
-
-        if (response === 'declined') {
-            emitToUser(inviterUsername, 'rpg:invitation-declined', { from: inviteeUsername });
-            return;
-        }
-
-        if (response === 'accepted') {
-            // If party doesn't exist, create it with the new structure.
-            if (!parties.has(inviterUsername)) {
-                parties.set(inviterUsername, {
-                    leader: inviterUsername,
-                    members: new Set([inviterUsername]),
-                    state: {
-                        currentLocation: null,
-                        inBattle: false,
-                    }
-                });
-            }
-
-            const party = parties.get(inviterUsername);
-            if (party.members.size < 4) {
-                party.members.add(inviteeUsername);
-
-                const partyMembersUsernames = Array.from(party.members);
-                partyMembersUsernames.forEach(memberUsername => {
-                    emitToUser(memberUsername, 'rpg:party-update', { party: partyMembersUsernames });
-                });
-            } else {
-                emitToUser(inviterUsername, 'rpg:invitation-error', { message: 'Party is full.' });
-                // Also notify the invitee that they couldn't join
-                emitToUser(inviteeUsername, 'rpg:invitation-error', { message: 'Party is full.' });
-            }
-        }
-    });
-
-
-    socket.on('party:initiate-battle', ({ partyId, locationId }) => {
-        if (!socket.username || socket.username !== partyId) {
-            // Only the leader can initiate a battle
-            return;
-        }
-
-        const party = parties.get(partyId);
-        if (!party) return;
-
-        const battleState = createBattle(party, locationId);
-
-        // Emit to all members of the party to start the battle
-        party.members.forEach(memberUsername => {
-            emitToUser(memberUsername, 'battle:started', battleState);
-        });
-    });
-
-    socket.on('battle:action', (payload) => {
-        if (!socket.username) return;
-
-        let partyId = null;
-        for (const [pId, p] of parties.entries()) {
-            if (p.members.has(socket.username)) {
-                partyId = pId;
-                break;
-            }
-        }
-
-        if (!partyId) return;
-
-        const battle = activeBattles.get(partyId);
-        if (!battle) return;
-
-        const currentTurnId = battle.turnOrder[battle.currentTurnIndex];
-        const playerUnit = battle.partyMembers.find(p => p.id === currentTurnId && p.name === socket.username);
-
-        if (!playerUnit) {
-            return; // Not this player's turn
-        }
-
-        const { action, targetId } = payload;
-
-        if (action === 'attack') {
-            const targetUnit = battle.enemies.find(e => e.id === targetId);
-            if (!targetUnit || targetUnit.hp <= 0) {
-                return; // Invalid target
-            }
-
-            // Simple damage calculation
-            const damage = playerUnit.character.stats.strength;
-            targetUnit.hp = Math.max(0, targetUnit.hp - damage);
-
-            battle.log.push(`${playerUnit.name} attacks ${targetUnit.name} for ${damage} damage!`);
-
-            // Check for win condition
-            const allEnemiesDefeated = battle.enemies.every(e => e.hp <= 0);
-            if (allEnemiesDefeated) {
-                battle.log.push('Victory! All enemies have been defeated.');
-                // Here you would typically end the battle and give rewards
-                // For now, we'll just log it and stop the turn progression.
-            } else {
-                 // Advance turn
-                battle.currentTurnIndex = (battle.currentTurnIndex + 1) % battle.turnOrder.length;
-            }
-
-            // Broadcast the new state to all members
-            const party = parties.get(partyId);
-            party.members.forEach(memberUsername => {
-                emitToUser(memberUsername, 'battle:state-update', battle);
-            });
         }
     });
 });
