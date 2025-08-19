@@ -22,7 +22,12 @@ const io = socketIo(server);
 
 const connectedUsers = new Map(); // Stores username -> Set<socket.id>
 const pendingInvitations = new Map(); // inviter -> Set<invitee>
-const parties = new Map(); // partyId (leader username) -> Set<username>
+const parties = new Map(); // partyId (leader username) -> { leader: string, members: Set<string>, state: object }
+const activeBattles = new Map(); // partyId -> battleState
+const ENEMY_TEMPLATES = {
+    'goblin': { name: 'Goblin', hp: 50, maxHp: 50, attack: 10, speed: 5 },
+    'orc': { name: 'Orc', hp: 100, maxHp: 100, attack: 15, speed: 3 }
+};
 
 // Middleware
 app.use(express.json()); // To parse JSON bodies
@@ -131,7 +136,7 @@ app.post('/api/rpg/mapconfig', (req, res) => {
 });
 
 
-// --- Helper to send full user data ---
+// --- Helper Functions ---
 function getOnlineUsersWithStatus() {
     const onlineUsernames = Array.from(connectedUsers.keys());
     const userListWithStatus = onlineUsernames
@@ -170,8 +175,48 @@ function emitUserData(socketOrUsername, user) {
     if (typeof socketOrUsername === 'string') {
         emitToUser(socketOrUsername, 'user data', payload);
     } else {
+        // This is a socket object
         socketOrUsername.emit('user data', payload);
     }
+}
+
+function createBattle(party) {
+    const partyId = party.leader;
+
+    const partyMembers = Array.from(party.members).map((username, index) => {
+        const user = db.findUserByUsername(username);
+        // Deep copy character data to avoid modifying the original user object
+        const character = JSON.parse(JSON.stringify(user.selectedCharacter));
+        return {
+            id: `player-${index}`,
+            name: user.username,
+            character: character,
+            hp: character.stats.strength * 10,
+            maxHp: character.stats.strength * 10,
+            speed: character.stats.dexterity
+        };
+    });
+
+    const enemies = [
+        { id: 'enemy-0', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp },
+        { id: 'enemy-1', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp }
+    ];
+
+    const turnOrder = [...partyMembers, ...enemies]
+        .sort((a, b) => b.speed - a.speed)
+        .map(unit => unit.id);
+
+    const battleState = {
+        partyId,
+        partyMembers,
+        enemies,
+        turnOrder,
+        currentTurnIndex: 0,
+        log: ['A battle has begun!']
+    };
+
+    activeBattles.set(partyId, battleState);
+    return battleState;
 }
 
 io.on('connection', (socket) => {
@@ -574,18 +619,30 @@ io.on('connection', (socket) => {
         }
 
         if (response === 'accepted') {
+            // If party doesn't exist, create it with the new structure.
             if (!parties.has(inviterUsername)) {
-                parties.set(inviterUsername, new Set([inviterUsername]));
+                parties.set(inviterUsername, {
+                    leader: inviterUsername,
+                    members: new Set([inviterUsername]),
+                    state: {
+                        currentLocation: null,
+                        inBattle: false,
+                    }
+                });
             }
-            const party = parties.get(inviterUsername);
-            if (party.size < 4) {
-                party.add(inviteeUsername);
 
-                party.forEach(memberUsername => {
-                    emitToUser(memberUsername, 'rpg:party-update', { party: Array.from(party) });
+            const party = parties.get(inviterUsername);
+            if (party.members.size < 4) {
+                party.members.add(inviteeUsername);
+
+                const partyMembersUsernames = Array.from(party.members);
+                partyMembersUsernames.forEach(memberUsername => {
+                    emitToUser(memberUsername, 'rpg:party-update', { party: partyMembersUsernames });
                 });
             } else {
                 emitToUser(inviterUsername, 'rpg:invitation-error', { message: 'Party is full.' });
+                // Also notify the invitee that they couldn't join
+                emitToUser(inviteeUsername, 'rpg:invitation-error', { message: 'Party is full.' });
             }
         }
     });
@@ -593,10 +650,13 @@ io.on('connection', (socket) => {
     socket.on('rpg:start-party-game', () => {
         if (!socket.username) return;
 
-        const party = parties.get(socket.username);
-        if (!party) return;
+        const partyId = socket.username;
+        const party = parties.get(partyId);
 
-        const partyMembers = Array.from(party);
+        // Only the leader can start the game.
+        if (!party || party.leader !== socket.username) return;
+
+        const partyMembers = Array.from(party.members);
         const partyData = partyMembers.map(username => {
             const user = db.findUserByUsername(username);
             return {
@@ -608,6 +668,100 @@ io.on('connection', (socket) => {
         partyMembers.forEach(memberUsername => {
             emitToUser(memberUsername, 'rpg:launch-game', { party: partyData });
         });
+    });
+
+    socket.on('party:action', (payload) => {
+        if (!socket.username) return;
+
+        let partyInfo = null;
+        for (const [pId, p] of parties.entries()) {
+            if (p.members.has(socket.username)) {
+                partyInfo = { partyId: pId, party: p };
+                break;
+            }
+        }
+
+        if (!partyInfo) return;
+        const { party } = partyInfo;
+
+        if (party.leader !== socket.username) {
+            return; // Only the leader can perform actions
+        }
+
+        const { action, data } = payload;
+
+        switch (action) {
+            case 'select-location':
+                party.state.currentLocation = data.locationId;
+                party.members.forEach(memberUsername => {
+                    emitToUser(memberUsername, 'party:state-updated', { state: party.state });
+                });
+                break;
+            case 'accept-quest':
+                const newBattleState = createBattle(party);
+                party.members.forEach(memberUsername => {
+                    emitToUser(memberUsername, 'battle:started', newBattleState);
+                });
+                break;
+            default:
+                return; // Unknown action
+        }
+    });
+
+    socket.on('battle:action', (payload) => {
+        if (!socket.username) return;
+
+        let partyId = null;
+        for (const [pId, p] of parties.entries()) {
+            if (p.members.has(socket.username)) {
+                partyId = pId;
+                break;
+            }
+        }
+
+        if (!partyId) return;
+
+        const battle = activeBattles.get(partyId);
+        if (!battle) return;
+
+        const currentTurnId = battle.turnOrder[battle.currentTurnIndex];
+        const playerUnit = battle.partyMembers.find(p => p.id === currentTurnId && p.name === socket.username);
+
+        if (!playerUnit) {
+            return; // Not this player's turn
+        }
+
+        const { action, targetId } = payload;
+
+        if (action === 'attack') {
+            const targetUnit = battle.enemies.find(e => e.id === targetId);
+            if (!targetUnit || targetUnit.hp <= 0) {
+                return; // Invalid target
+            }
+
+            // Simple damage calculation
+            const damage = playerUnit.character.stats.strength;
+            targetUnit.hp = Math.max(0, targetUnit.hp - damage);
+
+            battle.log.push(`${playerUnit.name} attacks ${targetUnit.name} for ${damage} damage!`);
+
+            // Check for win condition
+            const allEnemiesDefeated = battle.enemies.every(e => e.hp <= 0);
+            if (allEnemiesDefeated) {
+                battle.log.push('Victory! All enemies have been defeated.');
+                // Here you would typically end the battle and give rewards
+                // For now, we'll just log it and stop the turn progression.
+            } else {
+                 // Advance turn
+                battle.currentTurnIndex = (battle.currentTurnIndex + 1) % battle.turnOrder.length;
+            }
+
+            // Broadcast the new state to all members
+            const party = parties.get(partyId);
+            party.members.forEach(memberUsername => {
+                emitToUser(memberUsername, 'battle:state-update', battle);
+            });
+        }
     });
 });
 

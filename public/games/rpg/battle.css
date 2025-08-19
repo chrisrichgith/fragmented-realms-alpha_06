@@ -1,325 +1,60 @@
 body, html {
     margin: 0;
     padding: 0;
-    width: 100%;
+    font-family: sans-serif;
+    background-color: #1a1a1a;
+    color: #f0f0f0;
     height: 100%;
     overflow: hidden;
-    font-family: sans-serif;
-    color: white;
 }
 
 #battle-container {
     display: flex;
-    width: 100%;
-    height: 100%;
-    background-image: url('/images/RPG/Background_Spiel.png');
-    background-size: cover;
-    background-position: center;
+    justify-content: space-between;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
 }
 
-.battle-panel {
+.battle-column {
     flex: 1;
-    padding: 20px;
-    background-color: rgba(0, 0, 0, 0.6);
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow-y: auto; /* Make panel scrollable if content overflows */
+    padding: 10px;
+    margin: 0 10px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    overflow-y: auto;
 }
 
 #center-panel {
-    flex: 3;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-    box-sizing: border-box;
-    position: relative; /* This is crucial for positioning the drop zones */
-}
-
-.drop-zone {
-    position: absolute;
-    width: 130px; /* A bit larger than the item */
-    height: 130px;
-    border: 3px dashed rgba(255, 255, 255, 0.5);
-    background-color: rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    transition: background-color 0.3s, border-color 0.3s;
-}
-
-.drop-zone.drag-over {
-    background-color: rgba(0, 255, 0, 0.3);
-    border-color: rgba(173, 255, 47, 0.8);
-}
-
-.drop-zone .tactic-item {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.drop-zone .tactic-item img {
-    cursor: default; /* Change cursor back when item is placed */
-}
-
-/* --- Styles for Edit Mode --- */
-
-#save-coords-button {
-    position: absolute;
-    top: 25px;
-    right: 25px;
-    z-index: 100;
-    padding: 10px 20px;
-    background-color: #c9b037;
-    color: #2c1e10;
-    border: 2px solid #8a6d4f;
-    border-radius: 5px;
-    font-family: 'Cinzel', serif;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 0 15px rgba(0,0,0,0.5);
-    display: none; /* Hidden by default */
-}
-
-#save-coords-button:hover {
-    background-color: #f5eacb;
-}
-
-.drop-zone.edit-mode {
-    cursor: move;
-    border-style: solid;
-    border-color: #f5eacb;
-    box-shadow: 0 0 10px 3px rgba(255, 235, 179, 0.7);
-}
-
-#battle-map {
-    max-width: 100%;
-    max-height: 100%;
-    border: 3px solid #c9b037;
-    box-shadow: 0 0 20px rgba(0,0,0,0.7);
-}
-
-.battle-panel h2 {
-    text-align: center;
-    color: #f5eacb;
-    font-family: 'Cinzel', serif; /* Assuming this font is used, might need to import */
-}
-
-#player-character-card, #npc-character-cards {
-    width: 100%;
-}
-
-#player-character-card {
-    display: flex;
-    justify-content: center;
-    /* margin-top removed to shift cards up */
-}
-
-#npc-character-cards {
+    flex: 2;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    align-items: center;
-    margin-top: 10px; /* Reduced margin */
 }
 
-.char-card {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    border: 2px solid #8a6d4f;
-    background: rgba(40, 30, 30, 0.85);
+#battle-log {
+    flex-grow: 1;
+    background-color: #111;
     padding: 10px;
     margin-bottom: 10px;
-    box-sizing: border-box;
-    align-items: center;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 14px;
 }
 
-.char-top-section {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    justify-content: center;
+#actions-container {
+    height: 100px;
 }
 
-.char-card img {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    object-position: center 15%;
-    border: 2px solid #c9b037;
-    flex-shrink: 0;
-}
-
-.char-card-info {
-    width: 100%;
-}
-
-.char-card h3 {
-    margin: 0 0 8px 0;
-    font-size: 1.2em;
-    text-align: center;
-}
-
-.char-stats-container {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 100%;
-    margin-top: 5px;
-}
-
-.stat-bar-container {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.stat-bar {
-    flex-grow: 1;
-    height: 15px;
-    background-color: #333;
+.char-card, .enemy-card {
     border: 1px solid #555;
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.stat-bar > div {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.5s ease-in-out;
-}
-
-.health-bar {
-    background-color: #2b9d44; /* Green */
-}
-
-.mana-bar {
-    background-color: #3a7ac4; /* Blue */
-}
-
-.stat-value {
-    font-size: 0.9em;
-    font-weight: bold;
-    min-width: 50px; /* Ensure alignment */
-    text-align: right;
-}
-
-.char-drop-zone {
-    width: 60px;
-    height: 60px;
-    border: 2px dashed rgba(255, 255, 255, 0.4);
-    background-color: rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background-color 0.3s, border-color 0.3s;
-    box-sizing: border-box;
-}
-
-.char-drop-zone.drag-over {
-    background-color: rgba(0, 255, 0, 0.3);
-    border-color: rgba(173, 255, 47, 0.8);
-}
-
-.char-drop-zone .tactic-item {
-    width: 100%;
-    height: 100%;
-    padding: 2px;
-    box-sizing: border-box;
-}
-
-.char-drop-zone .tactic-item img {
-    width: 100%;
-    height: 100%;
-    border: none;
-    cursor: default;
+    padding: 10px;
+    margin-bottom: 10px;
     border-radius: 5px;
+    transition: all 0.2s ease-in-out;
 }
 
-#tactic-items-container {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 2px solid #8a6d4f;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-#tactic-items {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-top: 10px;
-    width: 100%;
-}
-
-.tactic-item {
-    /* The container for the draggable image */
-}
-
-.tactic-item img {
-    width: 55px;
-    height: 55px;
-    border: 2px solid #c9b037;
-    border-radius: 10px;
-    cursor: grab;
-}
-
-.tactic-item img:active {
-    cursor: grabbing;
-}
-
-/* --- NPC Card Specific Styles --- */
-.npc-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    border: 1px solid #8a6d4f;
-    background: rgba(40, 30, 30, 0.85);
-    padding: 8px;
-    width: 95%; /* Match player card width for alignment */
-    box-sizing: border-box;
-    margin: 0 auto; /* Center it in the container */
-}
-
-.npc-info-section {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.npc-class {
-    margin: 0;
-    font-size: 1.1em;
-    font-weight: bold;
-    color: #f5eacb;
-}
-
-.npc-card .stat-bar-container {
-    gap: 5px; /* Tighter gap */
-}
-
-.npc-card .stat-bar {
-    height: 12px; /* Shorter bars */
-}
-
-.npc-card .stat-value {
-    font-size: 0.85em;
-    min-width: 45px;
-}
-
-/* Use the existing drop-zone class, it will be a child of npc-card */
-.npc-card .char-drop-zone {
-    width: 60px; /* Same size as player's for consistency */
-    height: 60px;
-    flex-shrink: 0;
+.active-turn {
+    border-color: #ffc107;
+    box-shadow: 0 0 15px #ffc107;
+    transform: scale(1.02);
 }
