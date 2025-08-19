@@ -180,12 +180,11 @@ function emitUserData(socketOrUsername, user) {
     }
 }
 
-function createBattle(party) {
+function createBattle(party, locationId) {
     const partyId = party.leader;
 
     const partyMembers = Array.from(party.members).map((username, index) => {
         const user = db.findUserByUsername(username);
-        // Deep copy character data to avoid modifying the original user object
         const character = JSON.parse(JSON.stringify(user.selectedCharacter));
         return {
             id: `player-${index}`,
@@ -197,10 +196,17 @@ function createBattle(party) {
         };
     });
 
-    const enemies = [
-        { id: 'enemy-0', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp },
-        { id: 'enemy-1', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp }
-    ];
+    // Determine map and enemies based on location
+    let map = 'Wald.png'; // Default map
+    let enemies = [];
+    if (locationId === 'dungeon_8') {
+        map = 'Höhle.png';
+        enemies.push({ id: 'enemy-0', ...ENEMY_TEMPLATES.orc, hp: ENEMY_TEMPLATES.orc.hp });
+    } else {
+        // Default enemies
+        enemies.push({ id: 'enemy-0', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp });
+        enemies.push({ id: 'enemy-1', ...ENEMY_TEMPLATES.goblin, hp: ENEMY_TEMPLATES.goblin.hp });
+    }
 
     const turnOrder = [...partyMembers, ...enemies]
         .sort((a, b) => b.speed - a.speed)
@@ -208,6 +214,7 @@ function createBattle(party) {
 
     const battleState = {
         partyId,
+        map: map,
         partyMembers,
         enemies,
         turnOrder,
@@ -647,65 +654,22 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('rpg:start-party-game', () => {
-        if (!socket.username) return;
 
-        const partyId = socket.username;
+    socket.on('party:initiate-battle', ({ partyId, locationId }) => {
+        if (!socket.username || socket.username !== partyId) {
+            // Only the leader can initiate a battle
+            return;
+        }
+
         const party = parties.get(partyId);
+        if (!party) return;
 
-        // Only the leader can start the game.
-        if (!party || party.leader !== socket.username) return;
+        const battleState = createBattle(party, locationId);
 
-        const partyMembers = Array.from(party.members);
-        const partyData = partyMembers.map(username => {
-            const user = db.findUserByUsername(username);
-            return {
-                username: user.username,
-                character: user.selectedCharacter,
-            };
+        // Emit to all members of the party to start the battle
+        party.members.forEach(memberUsername => {
+            emitToUser(memberUsername, 'battle:started', battleState);
         });
-
-        partyMembers.forEach(memberUsername => {
-            emitToUser(memberUsername, 'rpg:launch-game', { party: partyData });
-        });
-    });
-
-    socket.on('party:action', (payload) => {
-        if (!socket.username) return;
-
-        let partyInfo = null;
-        for (const [pId, p] of parties.entries()) {
-            if (p.members.has(socket.username)) {
-                partyInfo = { partyId: pId, party: p };
-                break;
-            }
-        }
-
-        if (!partyInfo) return;
-        const { party } = partyInfo;
-
-        if (party.leader !== socket.username) {
-            return; // Only the leader can perform actions
-        }
-
-        const { action, data } = payload;
-
-        switch (action) {
-            case 'select-location':
-                party.state.currentLocation = data.locationId;
-                party.members.forEach(memberUsername => {
-                    emitToUser(memberUsername, 'party:state-updated', { state: party.state });
-                });
-                break;
-            case 'accept-quest':
-                const newBattleState = createBattle(party);
-                party.members.forEach(memberUsername => {
-                    emitToUser(memberUsername, 'battle:started', newBattleState);
-                });
-                break;
-            default:
-                return; // Unknown action
-        }
     });
 
     socket.on('battle:action', (payload) => {

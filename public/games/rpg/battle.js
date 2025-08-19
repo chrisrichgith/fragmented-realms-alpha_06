@@ -53,6 +53,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBattle(state) {
         if (!state) return;
 
+        // Render the map
+        const battleMapImage = document.getElementById('battle-map-image');
+        if (battleMapImage && state.map) {
+            battleMapImage.src = `/images/RPG/Background/${state.map}`;
+        }
+
         // Render party members
         // This is a simplified render. We'll need to create proper cards.
         playerPartyContainer.innerHTML = '<h3>Party</h3>';

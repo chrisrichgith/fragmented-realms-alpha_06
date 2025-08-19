@@ -1,5 +1,3 @@
-// This is the full, refactored content of game.js
-
 const LOCATIONS = {
     'city_1': { name: 'Varethyn', coords: { top: '11.24%', left: '26.06%', width: '10%', height: '15%' }, detailMap: '/images/RPG/Maps/Citymap.png', actions: ['trade', 'quest', 'rest'] },
     'village_2': { name: 'Dornhall', coords: { top: '38.06%', left: '16.24%', width: '8%', height: '8%' }, detailMap: '/images/RPG/Maps/Villagemap.png', actions: ['quest', 'rest'] },
@@ -60,37 +58,40 @@ function init() {
     };
     
     const urlParams = new URLSearchParams(window.location.search);
-    const partyParam = urlParams.get('party');
-    const usernameParam = urlParams.get('username');
+    const partyId = urlParams.get('partyId');
+    myUsername = urlParams.get('username');
 
-    if (usernameParam) {
-        myUsername = usernameParam;
-        localStorage.setItem('username', usernameParam);
+    if (myUsername) {
+        localStorage.setItem('username', myUsername);
     } else {
         myUsername = localStorage.getItem('username');
     }
 
-    if (partyParam) {
-        socket = io(); // Connect only if in a party
-        partyData = JSON.parse(decodeURIComponent(partyParam));
-        if (partyData.length > 0 && partyData[0].username === myUsername) {
-            isPartyLeader = true;
-        }
-        const myPartyData = partyData.find(p => p.username === myUsername);
-        if (myPartyData && myPartyData.character) {
-            startGame(myPartyData.character);
+    if (partyId) {
+        isPartyLeader = true;
+        socket = io();
+        setupSocketListeners();
+        const myChar = JSON.parse(localStorage.getItem('selectedCharacter'));
+        if (myChar) {
+            partyData = [{ username: myUsername, character: myChar }];
+            startGame(myChar);
         } else {
+            // Leader should have a character, but as a fallback...
             showScreen('title');
         }
     } else {
-        showScreen('title');
+        // This is a solo game.
+        const myChar = JSON.parse(localStorage.getItem('selectedCharacter'));
+        if (myChar) {
+            partyData = [{ username: myUsername, character: myChar }];
+            startGame(myChar);
+        } else {
+            showScreen('title');
+        }
     }
 
     setupEventListeners();
     initCharacterCreationScreen();
-    if (socket) {
-        setupSocketListeners();
-    }
 }
 
 // --- Sound ---
@@ -137,17 +138,14 @@ function setupEventListeners() {
 }
 
 function setupSocketListeners() {
-    socket.on('party:state-updated', ({ state }) => {
-        // A new state has been received from the server. Update the UI accordingly.
-        if (state.currentLocation && state.currentLocation !== currentLocationId) {
-            showLocationDetail(state.currentLocation);
-        }
-
-        if (state.inBattle) {
-            const partyQueryParam = encodeURIComponent(JSON.stringify(partyData));
-            const usernameQueryParam = encodeURIComponent(myUsername);
-            window.location.href = `battle.html?party=${partyQueryParam}&username=${usernameQueryParam}`;
-        }
+    if(!socket) return;
+    socket.on('battle:started', (battleState) => {
+        // The server has confirmed the battle and sent the initial state.
+        // We need to pass the full party data to the battle page.
+        // The server sends the full party member list in the battle state.
+        const partyQueryParam = encodeURIComponent(JSON.stringify(battleState.partyMembers.map(p => ({username: p.name, character: p.character}))));
+        const usernameQueryParam = encodeURIComponent(myUsername);
+        window.location.href = `battle.html?party=${partyQueryParam}&username=${usernameQueryParam}`;
     });
 }
 
@@ -330,13 +328,8 @@ function initWorldMap() {
 
 // --- Action Handlers ---
 function handleLocationClick(locId) {
-    if (socket) { // Party mode
-        if (isPartyLeader) {
-            socket.emit('party:action', { action: 'select-location', data: { locationId: locId } });
-        }
-    } else { // Solo mode
-        showLocationDetail(locId);
-    }
+    // In the new leader-only flow, map clicks are always local for the leader.
+    showLocationDetail(locId);
 }
 
 function showLocationDetail(locId) {
@@ -377,10 +370,9 @@ function displayLocationActions(locId) {
 
 function handleQuestAccept() {
     ui.questScrollModal.style.display = 'none';
-    if (socket) { // Party mode
-        if (isPartyLeader) {
-            socket.emit('party:action', { action: 'accept-quest' });
-        }
+    if (socket && isPartyLeader) { // Party mode
+        const partyId = myUsername; // Leader's username is the partyId
+        socket.emit('party:initiate-battle', { partyId: partyId, locationId: currentLocationId });
     } else { // Solo mode
         window.location.href = 'battle.html';
     }
