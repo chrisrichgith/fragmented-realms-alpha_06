@@ -7,179 +7,31 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <div class="login-overlay" id="loginOverlay">
-        <div class="login-box">
-            <div class="tabs">
-                <button class="tab-link active" data-tab="login">Login</button>
-                <button class="tab-link" data-tab="register">Registrieren</button>
-            </div>
+    <div id="root"></div>
 
-            <div id="login" class="tab-content" style="display: block;">
-                <h3>Login</h3>
-                <input type="text" id="loginIdentifier" placeholder="Benutzername oder Email" required>
-                <input type="password" id="loginPassword" placeholder="Passwort" required>
-                <button id="loginButton">Spiel betreten</button>
-            </div>
+    <!-- React via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-            <div id="register" class="tab-content">
-                <h3>Registrieren</h3>
-                <input type="text" id="registerUsername" placeholder="Benutzername" required maxlength="20">
-                <input type="email" id="registerEmail" placeholder="Email" required>
-                <input type="password" id="registerPassword" placeholder="Passwort" required>
-                <input type="password" id="registerConfirmPassword" placeholder="Passwort bestätigen" required>
-                <button id="registerButton">Account erstellen</button>
-            </div>
-        </div>
-    </div>
+    <!-- Babel for JSX transpilation in the browser (for development simplicity) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <div class="game-container">
-        <header class="main-header">
-            <div class="logo-container">
-                <img src="/images/Chat/Logo.png" alt="Fragmented Realms" class="main-logo">
-            </div>
-            <div class="user-info-container">
-                <div class="user-info" id="userInfo">Nicht eingeloggt</div>
-                <button id="logoutButton" class="logout-button" style="display: none;">Beenden</button>
-                <button id="adminPanelBtn" class="admin-button" style="display: none;">Admin Panel</button>
-            </div>
-        </header>
+    <!-- Socket.IO client -->
+    <script src="/socket.io/socket.io.js"></script>
 
-        <div class="main-content">
-            <div class="left-panels-wrapper" style="display: flex; flex-direction: column; gap: 0.5rem; width: 160px; flex-shrink: 0; overflow-y: auto;">
-                <div class="users-panel">
-                    <h3>Spieler Online</h3>
-                    <ul id="userList"></ul>
-                </div>
-                <div id="character-sheet" class="character-sheet-container">
-                    <h3>Charakter</h3>
-                    <h4 id="char-name">Charaktername</h4>
-                    <img id="char-portrait" src="/images/Chat/placeholder.svg" alt="Charakter Portrait" class="char-portrait">
-                    <ul id="charStats">
-                        <li class="char-stat"><span>Level:</span> <span id="charLevel">1</span></li>
-                        <li class="char-stat"><span>XP:</span> <span id="charXP">0</span></li>
-                        <li class="char-stat"><span>Stärke:</span> <span id="charStrength">0</span></li>
-                        <li class="char-stat"><span>Geschick:</span> <span id="charDexterity">0</span></li>
-                        <li class="char-stat"><span>Intelligenz:</span> <span id="charIntelligence">0</span></li>
-                    </ul>
-                    <button id="startRpgBtn" class="char-button">RPG starten</button>
-                </div>
-                <div id="party-container" class="party-container">
-                    <h3>Party</h3>
-                    <ul id="partyList"></ul>
-                    <button id="startPartyRpgBtn" style="display: none;">Start RPG for Party</button>
-                </div>
-            </div>
-
-            <div class="chat-container">
-                <div class="chat-messages" id="chatMessages"></div>
-                <div class="chat-footer">
-                    <div class="chat-input">
-                        <input type="text" id="messageInput" placeholder="Schreibe eine Nachricht..." disabled>
-                    </div>
-                    <button id="sendButton" class="send-button" disabled>Senden</button>
-                </div>
-            </div>
-
-            <div class="right-panels-wrapper" style="display: flex; flex-direction: column; gap: 0.5rem;">
-                <div class="resources-container">
-                    <div class="resource">
-                        <img src="/images/Chat/gold.png" alt="Gold" class="resource-icon">
-                        <span id="goldCount">0</span>
-                    </div>
-                    <div class="resource">
-                        <img src="/images/Chat/holz.png" alt="Holz" class="resource-icon">
-                        <span id="holzCount">0</span>
-                    </div>
-                    <div class="resource">
-                        <img src="/images/Chat/erz.png" alt="Erz" class="resource-icon">
-                        <span id="erzCount">0</span>
-                    </div>
-                    <div class="resource">
-                        <img src="/images/Chat/kristall.png" alt="Kristall" class="resource-icon">
-                        <span id="kristallCount">0</span>
-                    </div>
-                </div>
-                <div class="game-buttons-container">
-                    <h3 style="color: #8a6dff; margin-bottom: 1rem; text-align: center;">Spiele</h3>
-                    <div id="gameList" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="adminPanelModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close-button" id="closeAdminPanel">&times;</span>
-            <h2>Admin Panel</h2>
-            <div>
-                <label for="userSelect">Select User:</label>
-                <select id="userSelect"></select>
-            </div>
-            <fieldset>
-                <legend>Resources</legend>
-                <label>Gold: <input type="number" id="adminGold" min="0"></label>
-                <label>Holz: <input type="number" id="adminHolz" min="0"></label>
-                <label>Erz: <input type="number" id="adminErz" min="0"></label>
-                <label>Kristall: <input type="number" id="adminKristall" min="0"></label>
-            </fieldset>
-            <fieldset>
-                <legend>Games</legend>
-                <div id="adminGames"></div>
-            </fieldset>
-            <button id="saveAdminChanges">Save Changes</button>
-            <fieldset>
-                <legend>Password Reset</legend>
-                <input type="password" id="adminNewPassword" placeholder="New Password">
-                <button id="resetPasswordBtn">Reset Password</button>
-            </fieldset>
-            <fieldset>
-                <legend>Permissions</legend>
-                <label>
-                    <input type="checkbox" id="adminIsAdminCheckbox">
-                    Is Administrator
-                </label>
-            </fieldset>
-            <button id="deleteUserBtn" class="danger-btn">Delete User</button>
-        </div>
-    </div>
-
-    <div id="sendResourcesModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close-button" id="closeSendResourcesModal">&times;</span>
-            <h2>Ressourcen an <span id="sendToUser"></span> senden</h2>
-            <div class="send-resource-input">
-                <label>Gold:</label>
-                <input type="number" id="sendGold" min="0" placeholder="0">
-            </div>
-            <div class="send-resource-input">
-                <label>Holz:</label>
-                <input type="number" id="sendHolz" min="0" placeholder="0">
-            </div>
-            <div class="send-resource-input">
-                <label>Erz:</label>
-                <input type="number" id="sendErz" min="0" placeholder="0">
-            </div>
-            <div class="send-resource-input">
-                <label>Kristall:</label>
-                <input type="number" id="sendKristall" min="0" placeholder="0">
-            </div>
-            <button id="confirmSendResourcesBtn">Senden</button>
-        </div>
-    </div>
-
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="/js/chat.js"></script>
-
-    <!-- Invitation Modal -->
-    <div id="invitation-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h2 id="invitation-title">Einladung</h2>
-            <p id="invitation-text"></p>
-            <div class="modal-buttons">
-                <button id="invitation-accept-btn">Annehmen</button>
-                <button id="invitation-decline-btn">Ablehnen</button>
-            </div>
-        </div>
-    </div>
+    <!-- React Application -->
+    <!-- Load components first so they are defined for the entry point -->
+    <script type="text/babel" data-presets="react" src="/src/components/UserList.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/Chat.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/Party.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/Resources.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/CharacterSheet.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/GameList.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/Auth.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/Lobby.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/rpg/WorldMap.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/components/RPG.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/App.js"></script>
+    <script type="text/babel" data-presets="react" src="/src/index.js"></script>
 </body>
 </html>
