@@ -45,6 +45,7 @@ function init() {
         charNameInput: document.getElementById('creation-char-name'),
         gameCharacterCardContainer: document.getElementById('game-character-card-container'),
         npcSelectionContainer: document.getElementById('npc-selection-container'),
+        invitablePlayersList: document.getElementById('invitable-players-list'),
         locationOverlayContainer: document.getElementById('location-overlay-container'),
         locationName: document.getElementById('location-name'),
         locationDetailMap: document.getElementById('location-detail-map'),
@@ -142,6 +143,45 @@ function setupSocketListeners() {
         const partyQueryParam = encodeURIComponent(JSON.stringify(battleState.partyMembers.map(p => ({username: p.name, character: p.character}))));
         const usernameQueryParam = encodeURIComponent(myUsername);
         window.location.href = `battle.html?party=${partyQueryParam}&username=${usernameQueryParam}`;
+    });
+
+    socket.on('rpg:invitable-players-list', (players) => {
+        renderInvitablePlayers(players);
+    });
+}
+
+function renderInvitablePlayers(players) {
+    if (!ui.invitablePlayersList) return;
+    ui.invitablePlayersList.innerHTML = ''; // Clear existing list
+
+    if (players.length === 0) {
+        ui.invitablePlayersList.innerHTML = '<p>No other players available to invite.</p>';
+        return;
+    }
+
+    players.forEach(player => {
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'invitable-player';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = player.username;
+
+        const inviteBtn = document.createElement('button');
+        inviteBtn.textContent = 'Invite';
+        inviteBtn.dataset.username = player.username;
+        inviteBtn.className = 'invite-btn';
+
+        inviteBtn.addEventListener('click', (e) => {
+            if (socket) {
+                socket.emit('rpg:invite-player', player.username);
+                e.target.disabled = true;
+                e.target.textContent = 'Invited';
+            }
+        });
+
+        playerDiv.appendChild(nameSpan);
+        playerDiv.appendChild(inviteBtn);
+        ui.invitablePlayersList.appendChild(playerDiv);
     });
 }
 
@@ -257,6 +297,10 @@ function startGame(characterData) {
 
     updatePartyView();
     initWorldMap();
+
+    if (socket) {
+        socket.emit('rpg:get-invitable-players');
+    }
 }
 
 function updatePartyView() {

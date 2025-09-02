@@ -528,6 +528,23 @@ io.on('connection', (socket) => {
             }
         }
     });
+
+    socket.on('rpg:get-invitable-players', () => {
+        if (!socket.username) return;
+
+        const invitablePlayers = [];
+        const allOnlineUsers = Array.from(connectedUsers.keys());
+
+        for (const username of allOnlineUsers) {
+            if (username === socket.username) continue;
+
+            const user = db.findUserByUsername(username);
+            if (user && user.selectedCharacter) {
+                invitablePlayers.push({ username: user.username });
+            }
+        }
+        socket.emit('rpg:invitable-players-list', invitablePlayers);
+    });
 });
 
 // --- Automatic Resource Generation ---
