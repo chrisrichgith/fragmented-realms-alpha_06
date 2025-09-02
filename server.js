@@ -545,6 +545,15 @@ io.on('connection', (socket) => {
         }
         socket.emit('rpg:invitable-players-list', invitablePlayers);
     });
+
+    socket.on('rpg:register-game-socket', ({ username }) => {
+        if (username && connectedUsers.has(username)) {
+            socket.username = username;
+            console.log(`RPG game socket for ${username} registered with id ${socket.id}`);
+        } else {
+            console.log(`Failed to register RPG socket for username: ${username}`);
+        }
+    });
 });
 
 // --- Automatic Resource Generation ---
