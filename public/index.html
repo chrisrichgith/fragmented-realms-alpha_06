@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fragmented Realms</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/games/rpg/rpg.css">
 </head>
 <body>
     <div class="login-overlay" id="loginOverlay">
@@ -170,6 +171,10 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="/js/chat.js"></script>
 
+    <!-- RPG Scripts -->
+    <script src="/games/rpg/class_data.js"></script>
+    <script src="/games/rpg/game.js"></script>
+
     <!-- Invitation Modal -->
     <div id="invitation-modal" class="modal" style="display: none;">
         <div class="modal-content">
@@ -178,6 +183,262 @@
             <div class="modal-buttons">
                 <button id="invitation-accept-btn">Annehmen</button>
                 <button id="invitation-decline-btn">Ablehnen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="rpg-container" style="display: none;">
+        <div id="game-container">
+            <!-- Title Screen -->
+            <div id="title-screen">
+                <img src="/images/RPG/Logo.png" alt="Game Logo" id="game-logo">
+                <div class="menu-buttons">
+                    <button id="new-game-btn">Charakter erstellen</button>
+                    <button id="start-game-direkt-btn">Spiel starten</button>
+                    <button id="load-game-btn">Spiel fortsetzen</button>
+                    <button id="options-btn">Optionen</button>
+                    <button id="back-to-lobby-btn">Zurück zur Lobby</button>
+                </div>
+            </div>
+
+            <!-- Options Screen (initially hidden) -->
+            <div id="options-screen" style="display: none;">
+                <h2>Optionen</h2>
+                <div class="option-item">
+                    <label for="music-volume">Musik</label>
+                    <input type="range" id="music-volume" min="0" max="100" value="80">
+                </div>
+                <div class="option-item">
+                    <label for="sfx-volume">Soundeffekte</label>
+                    <input type="range" id="sfx-volume" min="0" max="100" value="100">
+                </div>
+                <div class="option-item">
+                    <label>Auflösung</label>
+                    <span>Demnächst</span>
+                </div>
+                <div class="option-item">
+                    <label>Sprache</label>
+                    <span>Deutsch</span>
+                </div>
+                <div class="menu-buttons">
+                    <button id="options-back-btn">Zurück</button>
+                </div>
+            </div>
+
+            <!-- Character Creation Screen (initially hidden) -->
+            <div id="character-creation-screen" style="display: none;">
+                <h2>Charaktererstellung</h2>
+                <div id="creation-main-container">
+                    <div id="creation-character-display">
+                        <img id="creation-portrait-display" src="/images/RPG/Charakter/male_silhouette.svg" alt="Selected Portrait">
+                        <div id="creation-class-display" class="creation-text-display">Klasse</div>
+                        <p id="creation-class-description" class="creation-text-display">Wähle eine Klasse, um eine Beschreibung und die Basiswerte zu sehen.</p>
+                        <div id="creation-stats-display" class="creation-text-display"></div>
+                        <div id="creation-char-name-wrapper">
+                            <label for="creation-char-name">Charaktername:</label>
+                            <input type="text" id="creation-char-name" placeholder="Name eingeben...">
+                        </div>
+                        <div id="creation-class-wrapper">
+                            <label for="creation-class-select">Klasse:</label>
+                            <select id="creation-class-select"></select>
+                        </div>
+                        <div id="creation-gender-wrapper">
+                            <label>Geschlecht:</label>
+                            <div class="gender-selector" id="creation-gender-selector">
+                                 <button class="gender-btn active" data-gender="male"><img src="/images/RPG/Charakter/M.png" alt="Männlich"></button>
+                                 <button class="gender-btn" data-gender="female"><img src="/images/RPG/Charakter/F.png" alt="Weiblich"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="menu-buttons">
+                    <button id="confirm-creation-btn" disabled>Charakter bestätigen</button>
+                    <button id="creation-back-btn">Zurück</button>
+                </div>
+            </div>
+
+            <!-- Game Screen (initially hidden) -->
+            <div id="game-screen" style="display: none;">
+                <div id="location-title-display"></div>
+                <div id="rpg-menu-container">
+                    <button id="rpg-menu-toggle-btn">
+                        <img src="/images/RPG/Menu.png" alt="Menu">
+                    </button>
+                    <div id="rpg-menu-popup" class="hidden">
+                        <button id="save-party-btn">Spiel speichern</button>
+                        <button id="load-party-btn">Spiel laden</button>
+                    </div>
+                </div>
+                <div class="game-ui-left">
+                    <div id="game-character-card-container">
+                        <!-- Character card will be injected here -->
+                    </div>
+                    <div id="npc-selection-container">
+                        <!-- NPC cards will be injected here -->
+                    </div>
+                    <div id="invitable-players-container">
+                        <h4>Invitable Players</h4>
+                        <div id="invitable-players-list"></div>
+                    </div>
+                </div>
+                <div id="world-map-container">
+                    <div id="world-map-wrapper">
+                        <div id="world-map-left" class="world-map-half"></div>
+                        <div id="world-map-right" class="world-map-half"></div>
+                        <div id="location-overlay-container"></div>
+                    </div>
+                     <!-- Location Detail Screen is now INSIDE the game screen for positioning context -->
+                    <div id="location-detail-screen" style="display: none;">
+                        <h2 id="location-name"></h2>
+                        <img id="location-detail-map" src="" alt="Location Map">
+                        <div id="location-actions"></div>
+                        <button id="back-to-world-map-btn">Zurück zur Weltkarte</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Predefined Character Naming Modal -->
+        <div id="name-char-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h2>Charakter benennen</h2>
+                <div class="modal-section">
+                    <label for="predef-char-name-input">Charaktername:</label>
+                    <input type="text" id="predef-char-name-input" maxlength="20" placeholder="Name eingeben">
+                </div>
+                <div class="modal-buttons">
+                    <button id="confirm-predef-name-btn">Bestätigen</button>
+                    <button id="cancel-predef-name-btn">Abbrechen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Elements -->
+        <audio id="bg-music" loop>
+            <source src="/games/rpg/Titel.ogg" type="audio/ogg">
+        </audio>
+        <audio id="sfx-click">
+            <source src="/games/rpg/Buttonklick.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="sfx-slide-open">
+            <source src="/Sounds/RPG/Slide_open.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="sfx-slide-close">
+            <source src="/Sounds/RPG/Slide_close.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="sfx-parchment">
+            <source src="/Sounds/RPG/rustling_parchment.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="sfx-quest-accept">
+            <source src="/Sounds/RPG/relieved_choir.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="sfx-quest-decline">
+            <source src="/Sounds/RPG/Declined_choir.mp3" type="audio/mpeg">
+        </audio>
+
+        <!-- Custom Character Creation Modal -->
+        <div id="custom-char-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h2>Charakter erstellen</h2>
+
+                <div class="modal-section">
+                    <label for="char-name-input">Charaktername:</label>
+                    <input type="text" id="char-name-input" maxlength="20" placeholder="Name eingeben">
+                </div>
+
+                <div class="modal-section">
+                    <h3>Attribute</h3>
+                    <p>Punkte zu verteilen: <span id="points-remaining">15</span></p>
+                    <div class="attribute-row">
+                        <label>Stärke</label>
+                        <div class="attribute-control">
+                            <button class="btn-attribute" data-stat="strength" data-action="minus">-</button>
+                            <input type="number" id="strength-input" value="5" readonly>
+                            <button class="btn-attribute" data-stat="strength" data-action="plus">+</button>
+                        </div>
+                    </div>
+                    <div class="attribute-row">
+                        <label>Geschick</label>
+                        <div class="attribute-control">
+                            <button class="btn-attribute" data-stat="dexterity" data-action="minus">-</button>
+                            <input type="number" id="dexterity-input" value="5" readonly>
+                            <button class="btn-attribute" data-stat="dexterity" data-action="plus">+</button>
+                        </div>
+                    </div>
+                    <div class="attribute-row">
+                        <label>Intelligenz</label>
+                        <div class="attribute-control">
+                            <button class="btn-attribute" data-stat="intelligence" data-action="minus">-</button>
+                            <input type="number" id="intelligence-input" value="5" readonly>
+                            <button class="btn-attribute" data-stat="intelligence" data-action="plus">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-buttons">
+                    <button id="confirm-char-btn">Bestätigen</button>
+                    <button id="cancel-char-btn">Abbrechen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Game Modal -->
+        <div id="save-game-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h2>Spiel speichern</h2>
+                <div class="modal-section">
+                    <label for="save-name-input">Name des Spielstands:</label>
+                    <input type="text" id="save-name-input" maxlength="30" placeholder="Mein Abenteuer">
+                </div>
+                <div class="modal-section">
+                    <h3>Vorhandene Spielstände:</h3>
+                    <div id="existing-saves-container">
+                        <!-- Existing saves will be listed here -->
+                    </div>
+                </div>
+                <div class="modal-buttons">
+                    <button id="confirm-save-btn">Speichern</button>
+                    <button id="cancel-save-btn">Abbrechen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Load Game Modal -->
+        <div id="load-game-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h2>Spiel laden</h2>
+                <div id="save-slots-container">
+                    <!-- Save slots will be injected here -->
+                </div>
+                <div class="modal-buttons">
+                    <button id="cancel-load-btn">Abbrechen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quest Scroll Modal -->
+        <div id="quest-scroll-modal" class="modal-overlay" style="display: none;">
+            <div class="quest-scroll-content">
+                <img src="/images/RPG/Charakter/Schriftrolle.png" alt="Quest Scroll">
+                <div class="quest-text-area">
+
+                </div>
+                <div class="quest-buttons">
+                    <button id="quest-accept-btn">Akzeptieren</button>
+                    <button id="quest-decline-btn">Ablehnen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invitation Modal -->
+        <div id="invitation-modal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h2 id="invitation-title">Einladung</h2>
+                <p id="invitation-text"></p>
+                <div class="modal-buttons">
+                    <button id="invitation-accept-btn">Annehmen</button>
+                    <button id="invitation-decline-btn">Ablehnen</button>
+                </div>
             </div>
         </div>
     </div>

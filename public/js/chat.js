@@ -33,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageInput = document.getElementById('messageInput');
     const sendButton = document.getElementById('sendButton');
     const adminPanelBtn = document.getElementById('adminPanelBtn');
+    const gameContainer = document.querySelector('.game-container');
+    const rpgContainer = document.getElementById('rpg-container');
 
     // Modals
     const adminPanelModal = document.getElementById('adminPanelModal');
@@ -354,16 +356,21 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Bitte logge dich zuerst ein.");
             return;
         }
-        // Always pass the username. The RPG window will handle the rest.
-        const url = `/games/rpg/index.html?username=${encodeURIComponent(currentUser)}`;
-        window.open(url, '_blank');
+        // Hide lobby and show RPG
+        if (gameContainer && rpgContainer) {
+            gameContainer.style.display = 'none';
+            rpgContainer.style.display = 'block';
+        }
     });
 
     startPartyRpgBtn.addEventListener('click', () => {
         // This button is only visible to the leader.
         // The server will construct the full party data when the leader initiates the battle.
-        const url = `/games/rpg/index.html?username=${encodeURIComponent(currentUser)}&partyId=${encodeURIComponent(currentUser)}`;
-        window.open(url, '_blank');
+        if (gameContainer && rpgContainer) {
+            gameContainer.style.display = 'none';
+            rpgContainer.style.display = 'block';
+            // The RPG's game.js will need to handle the partyId logic now
+        }
     });
 
     if (adminPanelBtn) {

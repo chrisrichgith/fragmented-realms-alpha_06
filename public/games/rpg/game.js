@@ -104,6 +104,20 @@ function playClickSound() {
 // --- Event Listeners Setup ---
 function setupEventListeners() {
     document.querySelectorAll('button').forEach(button => button.addEventListener('click', playClickSound));
+
+    // This button is now part of the unified UI
+    const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
+    if (backToLobbyBtn) {
+        backToLobbyBtn.addEventListener('click', () => {
+            const gameContainer = document.querySelector('.game-container');
+            const rpgContainer = document.getElementById('rpg-container');
+            if (gameContainer && rpgContainer) {
+                rpgContainer.style.display = 'none';
+                gameContainer.style.display = 'flex'; // Or 'block', depending on its default
+            }
+        });
+    }
+
     ui.newGameBtn.addEventListener('click', () => showScreen('character-creation'));
     ui.startGameDirektBtn.addEventListener('click', () => {
         const characterData = JSON.parse(localStorage.getItem(`selectedCharacter_${myUsername}`));
