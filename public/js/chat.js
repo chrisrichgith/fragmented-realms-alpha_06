@@ -360,17 +360,42 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameContainer && rpgContainer) {
             gameContainer.style.display = 'none';
             rpgContainer.style.display = 'block';
+            RpgGame.init(currentUser, false, socket);
         }
     });
 
     startPartyRpgBtn.addEventListener('click', () => {
+        if (!currentUser) {
+            alert("Bitte logge dich zuerst ein.");
+            return;
+        }
         // This button is only visible to the leader.
-        // The server will construct the full party data when the leader initiates the battle.
         if (gameContainer && rpgContainer) {
             gameContainer.style.display = 'none';
             rpgContainer.style.display = 'block';
-            // The RPG's game.js will need to handle the partyId logic now
+            RpgGame.init(currentUser, true, socket);
         }
+    });
+
+    // Listen for custom event from RPG game to update character sheet
+    document.addEventListener('rpgCharacterCreated', (e) => {
+        const charData = e.detail;
+        // This logic is similar to the 'character-selected' postMessage handler
+        localStorage.setItem(`selectedCharacter_${currentUser}`, JSON.stringify(charData));
+        socket.emit('character:save', charData);
+
+        // Manually update the character sheet in the lobby
+        const portraitEl = document.getElementById('char-portrait');
+        const nameEl = document.getElementById('char-name');
+        if (portraitEl) portraitEl.src = charData.image;
+        if (nameEl) nameEl.textContent = charData.name;
+        if (charData.stats) {
+            document.getElementById('charStrength').textContent = charData.stats.strength;
+            document.getElementById('charDexterity').textContent = charData.stats.dexterity;
+            document.getElementById('charIntelligence').textContent = charData.stats.intelligence;
+        }
+        characterIsSelected = true;
+        startRpgBtn.textContent = 'Spiel fortsetzen';
     });
 
     if (adminPanelBtn) {
