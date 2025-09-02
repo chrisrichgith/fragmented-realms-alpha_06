@@ -130,6 +130,21 @@ app.post('/api/rpg/mapconfig', (req, res) => {
 
 
 // --- Helper to send full user data ---
+async function broadcastUserList() {
+    const usernames = Array.from(connectedUsers.keys());
+    const userListPayload = [];
+    for (const username of usernames) {
+        const user = db.findUserByUsername(username);
+        if (user) {
+            userListPayload.push({
+                username: user.username,
+                hasRpgChar: !!user.selectedCharacter,
+            });
+        }
+    }
+    io.emit('user list', userListPayload);
+}
+
 function emitUserData(socketOrUsername, user) {
     if (!user) return; // Safety check
 
@@ -215,7 +230,7 @@ io.on('connection', (socket) => {
 
             emitUserData(socket, user);
 
-            io.emit('user list', Array.from(connectedUsers.keys()));
+            broadcastUserList();
             io.emit('chat message', { user: 'System', text: `${user.username} ist dem Spiel beigetreten.` });
 
         } catch (error) {
@@ -241,7 +256,7 @@ io.on('connection', (socket) => {
             console.log(`User ${socket.username} disconnected.`);
             await db.setUserOnline(socket.username, false);
             connectedUsers.delete(socket.username);
-            io.emit('user list', Array.from(connectedUsers.keys()));
+            broadcastUserList();
             io.emit('chat message', { user: 'System', text: `${socket.username} hat das Spiel verlassen.` });
         }
     };
@@ -309,7 +324,7 @@ io.on('connection', (socket) => {
                     targetSocket.disconnect();
                 }
             }
-            io.emit('user list', Array.from(connectedUsers.keys()));
+            broadcastUserList();
         }
     });
 
